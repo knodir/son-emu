@@ -33,14 +33,24 @@ Python API.
 Does not test API endpoints. This is done in separated test suites.
 """
 
-import time
-import unittest
-from emuvim.dcemulator.node import EmulatorCompute
-from emuvim.test.base import SimpleTestTopology
+#import time
+#import unittest
+#from emuvim.dcemulator.node import EmulatorCompute
+#from emuvim.test.base import SimpleTestTopology
+#from mininet.node import RemoteController
+
+import logging
+from mininet.log import setLogLevel
+from emuvim.dcemulator.net import DCNetwork
+from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
+from emuvim.api.sonata import SonataDummyGatekeeperEndpoint
 from mininet.node import RemoteController
 
+import time
+from mininet.clean import cleanup
 
-def testSDNChainingMultiService():
+
+def runSDNChainingMultiService():
     """
     This function is copied from src/emuvim/test/unittests/test_emulator.py
     Create a two data centers and interconnect them with additional
@@ -50,11 +60,14 @@ def testSDNChainingMultiService():
     Delete only the first service, and check that other one still works
     """
     # create network
-    self.createNet(
+    testTop = SimpleTestTopology()
+    #SimpleTestTopology.createNet(
+    testTop.createNet(
         nswitches=3, ndatacenter=2, nhosts=0, ndockers=0,
         autolinkswitches=True,
         controller=RemoteController,
         enable_learning=False)
+
     # setup links
     self.net.addLink(self.dc[0], self.s[0])
     self.net.addLink(self.s[2], self.dc[1])
@@ -100,5 +113,88 @@ def testSDNChainingMultiService():
     self.stopNet()
 
 
+def basicTest():
+    """ This basic test creates one data center and two VNFs with default
+    ubuntu:xenial image, and checks if VNFs can ping each other. """
+
+    net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
+    # add one data center
+    dc = net.addDatacenter('dc1', metadata={'node-upgrade'})
+    # connect data center to API endpoint
+    api = RestApiEndpoint("0.0.0.0", 5001)
+    # connect DC to the network
+    api.connectDCNetwork(net)
+    # connect DC to the endpoint
+    api.connectDatacenter(dc)
+
+    print(net)
+    print(api)
+
+    # start API endpoint and network
+    api.start()
+    net.start()
+
+    # create two VNFs
+    vnf1 = dc.startCompute("vnf1", network=[{'id': 'intf1', 'ip': '10.0.10.1/24'}])
+    vnf2 = dc.startCompute("vnf2", network=[{'id': 'intf2', 'ip': '10.0.10.2/24'}])
+    print('ping vnfs before explicit chaining: %s' % net.ping([vnf1, vnf2]))
+
+    # explcitly chain two VNFs
+    net.setChain('vnf1', 'vnf2', 'intf1', 'intf2', bidirectional=True, cmd='add-flow', cookie=1)
+    print('ping vnfs after explicit chaining: %s' % net.ping([vnf1, vnf2]))
+
+    # prompt containernet CLI for further debugging
+    net.CLI()
+    # exit containernet when user types 'exit'
+    net.stop()
+
+
+
+def nodeUpgrade():
+    """ TBD """
+
+    net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
+    # add one data center
+    dc = net.addDatacenter('dc1', metadata={'node-upgrade'})
+
+    api = RestApiEndpoint("0.0.0.0", 5001)
+
+    api.connectDCNetwork(net)
+    # connect data centers to the endpoint
+    api.connectDatacenter(dc)
+
+    # sw = net.addSwitch('sw1')
+    # add one host
+    # host1 = net.addHost('h1')
+    # add one docker
+    # docker1 = net.addDocker('docker1', dimage='ubuntu:trusty')
+    print(net)
+    print(api)
+    #print(host1)
+    #print(docker1)
+    api.start()
+    net.start()
+
+    vnf1 = dc.startCompute("vnf1", network=[{'id': 'intf1', 'ip': '10.0.10.1/24'}])
+    vnf2 = dc.startCompute("vnf2", network=[{'id': 'intf2', 'ip': '10.0.10.2/24'}])
+    print('(1) ping vnfs: %s' % net.ping([vnf1, vnf2]))
+
+    # delete the first service chain
+    net.setChain('vnf1', 'vnf2', 'intf1', 'intf2', bidirectional=True, cmd='add-flow', cookie=1)
+    print('(2) ping vnfs: %s' % net.ping([vnf1, vnf2]))
+
+    net.CLI()
+
+    # time.sleep(30)
+    net.stop()
+
+
 if __name__ == '__main__':
-    testSDNChainingMultiService()
+    # runSDNChainingMultiService()
+    logging.basicConfig(level=logging.DEBUG)
+
+    basicTest()
+
+    # nodeUpgrade()
+    
+    cleanup()
