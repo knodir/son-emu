@@ -1,44 +1,3 @@
-"""
-Copyright (c) 2015 SONATA-NFV
-ALL RIGHTS RESERVED.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-Neither the name of the SONATA-NFV [, ANY ADDITIONAL AFFILIATION]
-nor the names of its contributors may be used to endorse or promote
-products derived from this software without specific prior written
-permission.
-
-This work has been performed in the framework of the SONATA project,
-funded by the European Commission under Grant number 671517 through
-the Horizon 2020 and 5G-PPP programmes. The authors would like to
-acknowledge the contributions of their colleagues of the SONATA
-partner consortium (www.sonata-nfv.eu).
-"""
-"""
-Test suite to automatically test emulator functionalities.
-Directly interacts with the emulator through the Mininet-like
-Python API.
-
-Does not test API endpoints. This is done in separated test suites.
-"""
-
-#import time
-#import unittest
-#from emuvim.dcemulator.node import EmulatorCompute
-#from emuvim.test.base import SimpleTestTopology
-#from mininet.node import RemoteController
-
 import logging
 from mininet.log import setLogLevel
 from emuvim.dcemulator.net import DCNetwork
@@ -158,36 +117,37 @@ def nodeUpgrade():
     # add one data center
     dc = net.addDatacenter('dc1', metadata={'node-upgrade'})
 
+    # create REST API endpoint
     api = RestApiEndpoint("0.0.0.0", 5001)
 
+    # connect API endpoint to containernet
     api.connectDCNetwork(net)
+
     # connect data centers to the endpoint
     api.connectDatacenter(dc)
 
-    # sw = net.addSwitch('sw1')
-    # add one host
-    # host1 = net.addHost('h1')
-    # add one docker
-    # docker1 = net.addDocker('docker1', dimage='ubuntu:trusty')
-    print(net)
-    print(api)
-    #print(host1)
-    #print(docker1)
+    # start API and containernet
     api.start()
     net.start()
 
+    # create client with one interface
     client = dc.startCompute("client",
             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
 
+    # create snort VNF with two interfaces. 'input' interface for 'client' and
+    # 'output' interface for the 'server' VNF.
     snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
             network=[{'id': 'input', 'ip': '10.0.0.3/24'},
-                {'id': 'output', 'ip': '10.0.1.4/24'}])
+                {'id': 'output', 'ip': '10.0.0.4/24'}])
 
+    # create server VNF with one interface
     server = dc.startCompute("server",
-            network=[{'id': 'intf2', 'ip': '10.0.1.5/24'}])
-    print('ping client -> server before explicit chaining: %s' % net.ping(
-        [client, server]))
+            network=[{'id': 'intf2', 'ip': '10.0.0.5/24'}])
+    print('ping client -> server before explicit chaining. Packet drop %s%%' % 
+            net.ping([client, server]))
 
+    # bridge snort interfaces and make snort listen to the bridge. This is
+    # essentially manual execution of /start.sh script inside snort image 
     print(subprocess.call("sudo docker exec -it mn.snort ip addr flush dev input", shell=True))
     print(subprocess.call("sudo docker exec -it mn.snort ip addr flush dev output", shell=True))
     print(subprocess.call("sudo docker exec -it mn.snort brctl addbr br0", shell=True))
@@ -203,8 +163,8 @@ def nodeUpgrade():
     net.setChain('snort', 'server', 'output', 'intf2', bidirectional=True,
             cmd='add-flow')
 
-    print('ping client -> server after explicit chaining: %s' % net.ping(
-        [client, server]))
+    print('ping client -> server after explicit chaining. Packet drop %s%%' % 
+            net.ping([client, server]))
 
     net.CLI()
     net.stop()
