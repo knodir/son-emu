@@ -1,10 +1,14 @@
 FROM      osrg/ryu
-MAINTAINER steven.vanrossem@intec.ugent.be
+MAINTAINER nodir.qodirov@gmail.com
+
+# slightly modified version of sonatanfv/sonata-fw-vnf
 
 RUN	apt-get update && apt-get install -y \
 	net-tools \
 	iproute \
-	inetutils-ping
+	inetutils-ping \
+  vim \
+  tcpdump
 
 # install OpenvSwitch 
 RUN apt-get install -y openvswitch-switch openvswitch-common 
