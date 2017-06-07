@@ -146,15 +146,9 @@ def nodeUpgrade():
     print('ping client -> server before explicit chaining. Packet drop %s%%' % 
             net.ping([client, server]))
 
-    # bridge snort interfaces and make snort listen to the bridge. This is
-    # essentially manual execution of /start.sh script inside snort image 
-    print(subprocess.call("sudo docker exec -it mn.snort ip addr flush dev input", shell=True))
-    print(subprocess.call("sudo docker exec -it mn.snort ip addr flush dev output", shell=True))
-    print(subprocess.call("sudo docker exec -it mn.snort brctl addbr br0", shell=True))
-    print(subprocess.call("sudo docker exec -it mn.snort brctl addif br0 input output", shell=True))
-    print(subprocess.call("sudo docker exec -it mn.snort ifconfig br0 up", shell=True))
-    print(subprocess.call("sudo docker exec -it mn.snort pkill snort", shell=True))
-    print(subprocess.call("sudo docker exec -it mn.snort snort -i br0 -D -q -k none -K ascii -l /snort-logs -A fast -c /etc/snort/snort.conf", shell=True))
+    # execute /start.sh script inside snort image. It bridges input and output
+    # interfaces with br0, and starts snort process listering on br0.
+    print(subprocess.call('sudo docker exec -i mn.snort /bin/bash -c "sh /start.sh"', shell=True))
     print('snort start done')
 
     # chain 'client -> snort -> server'
