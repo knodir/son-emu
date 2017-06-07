@@ -48,6 +48,7 @@ from mininet.node import RemoteController
 
 import time
 from mininet.clean import cleanup
+import subprocess
 
 
 def runSDNChainingMultiService():
@@ -175,17 +176,37 @@ def nodeUpgrade():
     api.start()
     net.start()
 
-    vnf1 = dc.startCompute("vnf1", network=[{'id': 'intf1', 'ip': '10.0.10.1/24'}])
-    vnf2 = dc.startCompute("vnf2", network=[{'id': 'intf2', 'ip': '10.0.10.2/24'}])
-    print('(1) ping vnfs: %s' % net.ping([vnf1, vnf2]))
+    client = dc.startCompute("client",
+            network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
 
-    # delete the first service chain
-    net.setChain('vnf1', 'vnf2', 'intf1', 'intf2', bidirectional=True, cmd='add-flow', cookie=1)
-    print('(2) ping vnfs: %s' % net.ping([vnf1, vnf2]))
+    snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
+            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                {'id': 'output', 'ip': '10.0.1.4/24'}])
+
+    server = dc.startCompute("server",
+            network=[{'id': 'intf2', 'ip': '10.0.1.5/24'}])
+    print('ping client -> server before explicit chaining: %s' % net.ping(
+        [client, server]))
+
+    print(subprocess.call("sudo docker exec -it mn.snort ip addr flush dev input", shell=True))
+    print(subprocess.call("sudo docker exec -it mn.snort ip addr flush dev output", shell=True))
+    print(subprocess.call("sudo docker exec -it mn.snort brctl addbr br0", shell=True))
+    print(subprocess.call("sudo docker exec -it mn.snort brctl addif br0 input output", shell=True))
+    print(subprocess.call("sudo docker exec -it mn.snort ifconfig br0 up", shell=True))
+    print(subprocess.call("sudo docker exec -it mn.snort pkill snort", shell=True))
+    print(subprocess.call("sudo docker exec -it mn.snort snort -i br0 -D -q -k none -K ascii -l /snort-logs -A fast -c /etc/snort/snort.conf", shell=True))
+    print('snort start done')
+
+    # chain 'client -> snort -> server'
+    net.setChain('client', 'snort', 'intf1', 'input', bidirectional=True,
+            cmd='add-flow')
+    net.setChain('snort', 'server', 'output', 'intf2', bidirectional=True,
+            cmd='add-flow')
+
+    print('ping client -> server after explicit chaining: %s' % net.ping(
+        [client, server]))
 
     net.CLI()
-
-    # time.sleep(30)
     net.stop()
 
 
@@ -193,8 +214,8 @@ if __name__ == '__main__':
     # runSDNChainingMultiService()
     logging.basicConfig(level=logging.DEBUG)
 
-    basicTest()
+    # basicTest()
 
-    # nodeUpgrade()
+    nodeUpgrade()
     
     cleanup()
