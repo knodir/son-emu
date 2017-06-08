@@ -5,10 +5,10 @@ from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
 from emuvim.api.sonata import SonataDummyGatekeeperEndpoint
 from mininet.node import RemoteController
 
+import os
 import time
 from mininet.clean import cleanup
 import subprocess
-
 
 def runSDNChainingMultiService():
     """
@@ -136,7 +136,8 @@ def nodeUpgrade():
 
     # create snort VNF with two interfaces. 'input' interface for 'client' and
     # 'output' interface for the 'server' VNF.
-    snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
+    # snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
+    snort = dc.startCompute("snort", image='knodir/sonata-fw-vnf',
             network=[{'id': 'input', 'ip': '10.0.0.3/24'},
                 {'id': 'output', 'ip': '10.0.0.4/24'}])
 
@@ -148,8 +149,18 @@ def nodeUpgrade():
 
     # execute /start.sh script inside snort image. It bridges input and output
     # interfaces with br0, and starts snort process listering on br0.
-    print(subprocess.call('sudo docker exec -i mn.snort /bin/bash -c "sh /start.sh"', shell=True))
-    print('snort start done')
+    #print(subprocess.call('sudo docker exec -i mn.snort /bin/bash -c "sh /start.sh"', shell=True))
+    #print('snort start done')
+    devnull = open(os.devnull, 'wb')
+    #print(subprocess.Popen(['nohup',
+    #    'sudo docker exec -i mn.snort /bin/bash /root/start.sh'],
+    #    stdout=devnull, stderr=devnull))
+    print(subprocess.call('sudo docker exec -i mn.snort /bin/bash /root/start.sh &', shell=True))
+    print('fw start done')
+
+    print('> sleeping 10s to wait ryu controller initialize')
+    time.sleep(10)
+    print('< wait complete')
 
     # chain 'client -> snort -> server'
     net.setChain('client', 'snort', 'intf1', 'input', bidirectional=True,
