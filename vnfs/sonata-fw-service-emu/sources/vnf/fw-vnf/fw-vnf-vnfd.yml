@@ -15,7 +15,7 @@ description: "Firewall VNF based on an Openflow controller Ryu + OpenVswitch"
 ##
 virtual_deployment_units:
   - id: "1"
-    vm_image: "sonatanfv/sonata-fw-vnf"
+    vm_image: "knodir/sonata-fw-vnf"
     vm_image_format: "docker"
     resource_requirements:
       cpu:
