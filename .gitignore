@@ -78,3 +78,5 @@ target/
 
 # JUnit xml
 utils/ci/junit-xml/*.xml
+
+*.pcap
