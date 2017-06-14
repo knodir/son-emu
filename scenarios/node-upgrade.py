@@ -209,7 +209,6 @@ def runFirewallOnly():
 
     # execute /start.sh script inside firewall Docker image. It start Ryu
     # controller and OVS with proper configuration.
-    devnull = open(os.devnull, 'wb')
     print(subprocess.call('sudo docker exec -i mn.fw /bin/bash /root/start.sh &',
                           shell=True))
     print('fw start done')
@@ -227,6 +226,78 @@ def runFirewallOnly():
     print('ping client -> server after explicit chaining. Packet drop %s%%' %
           net.ping([client, server]))
 
+    net.CLI()
+    net.stop()
+
+
+def runDummyForwarderOnly():
+    """ Put Dummy-Forwarder between client and server to check if packets sent
+    by client passed through dummy-forwarder VNF and reach the server VNF. Here,
+    each VNF is on a separate data center connected with a switch. """
+
+    net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
+    # add 3 data centers
+    client_dc = net.addDatacenter('client-dc')
+    chain_dc = net.addDatacenter('chain-dc')
+    server_dc = net.addDatacenter('server-dc')
+
+    # connect data centers with switches
+    s1 = net.addSwitch('s1')
+    s2 = net.addSwitch('s2')
+
+    # link data centers and switches
+    net.addLink(client_dc, s1)
+    net.addLink(s1, chain_dc)
+    net.addLink(chain_dc, s2)
+    net.addLink(s2, server_dc)
+
+    # create REST API endpoint
+    api = RestApiEndpoint("0.0.0.0", 5001)
+
+    # connect API endpoint to containernet
+    api.connectDCNetwork(net)
+
+    # connect data centers to the endpoint
+    api.connectDatacenter(client_dc)
+    api.connectDatacenter(chain_dc)
+    api.connectDatacenter(server_dc)
+
+    # start API and containernet
+    api.start()
+    net.start()
+
+    # create client with one interface
+    client = client_dc.startCompute("client",
+                             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+
+    # create dummy-forwarder (fwdr) VNF with two interfaces. Its 'input'
+    # interface faces the client and output interface the server VNF.
+    fwdr = chain_dc.startCompute("fwdr", image='knodir/dummy-forwarder',
+                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                                     {'id': 'output', 'ip': '10.0.0.4/24'}])
+
+    # create server VNF with one interface
+    server = server_dc.startCompute("server",
+                             network=[{'id': 'intf2', 'ip': '10.0.0.10/24'}])
+    print('ping client -> server before explicit chaining. Packet drop %s%%' %
+          net.ping([client, server]))
+
+    # execute /start.sh script inside dummy-forwarder image. It bridges input
+    # and output interfaces with br0 to enable packet forwarding.
+    print(subprocess.call(
+        'sudo docker exec -i mn.fwdr /bin/bash -c "sh /start.sh"', shell=True))
+    print('dummy-forwarder VNF started')
+
+    # chain 'client -> dummy-forwarder -> server'
+    net.setChain('client', 'fwdr', 'intf1', 'input', bidirectional=True,
+                 cmd='add-flow')
+    net.setChain('fwdr', 'server', 'output', 'intf2', bidirectional=True,
+                 cmd='add-flow')
+
+    print('ping client -> server after explicit chaining. Packet drop %s%%' %
+          net.ping([client, server]))
+
+    # we currently do not need this
     net.CLI()
     net.stop()
 
@@ -379,9 +450,11 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
     # basicTest()
+    runDummyForwarderOnly()
     # runIDSOnly()
     # runFirewallOnly()
+    # runVPNOnly()
     # flatNet()
-    nodeUpgrade()
+    # nodeUpgrade()
 
     cleanup()
