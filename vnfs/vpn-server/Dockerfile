@@ -12,7 +12,6 @@ RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -
 
 # move tcpdump from sbin to slience apparmor
 RUN mv /usr/sbin/tcpdump /usr/local/bin/
-RUN mv /usr/sbin/tcpdump /usr/local/bin/
 
 CMD service rsyslog restart
 CMD service openvpn start

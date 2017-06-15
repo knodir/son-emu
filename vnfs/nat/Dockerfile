@@ -14,6 +14,8 @@ RUN	apt-get update && apt-get install -y \
 # install OpenvSwitch 
 RUN apt-get install -y openvswitch-switch openvswitch-common 
 
+# move tcpdump from sbin to slience apparmor
+RUN mv /usr/sbin/tcpdump /usr/local/bin/
 
 ADD start.sh start.sh
 RUN chmod +x start.sh
