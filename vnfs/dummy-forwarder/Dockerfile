@@ -20,6 +20,9 @@ RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -
 ADD start.sh start.sh
 RUN chmod +x start.sh
 
+# move tcpdump from sbin to slience apparmor
+RUN mv /usr/sbin/tcpdump /usr/local/bin/
+
 # set entry point for emulator gatekeeper
 ENV SON_EMU_CMD ./start.sh
 
