@@ -303,9 +303,9 @@ def runDummyForwarderOnly():
 
 
 def runNATOnly():
-    """ Put Dummy-Forwarder between client and server to check if packets sent
-    by client passed through dummy-forwarder VNF and reach the server VNF. Here,
-    each VNF is on a separate data center connected with a switch. """
+    """ Put NAT between client and server to check if packets sent
+    by client pass through NAT VNF and reach the server VNF on different subnet.
+    Here, each VNF is on a separate data center connected with a switch. """
 
     net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
     # add 3 data centers
@@ -342,9 +342,9 @@ def runNATOnly():
     client = client_dc.startCompute("client",
                              network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
 
-    # create dummy-forwarder (fwdr) VNF with two interfaces. Its 'input'
+    # create nat VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
-    fwdr = chain_dc.startCompute("fwdr", image='knodir/dummy-forwarder',
+    nat = chain_dc.startCompute("nat", image='knodir/nat',
                             network=[{'id': 'input', 'ip': '10.0.0.3/24'},
                                      {'id': 'output', 'ip': '10.0.10.4/24'}])
 
@@ -358,23 +358,23 @@ def runNATOnly():
         'sudo docker exec -i mn.server /bin/bash -c "route add -net 10.0.0.0/24 dev intf2"', shell=True))
 
     # set up port forwarding from 'input' interface to 'output' interface
-    print(subprocess.call(
-        'sudo docker exec -i mn.nat /bin/bash -c "iptables -t nat -A POSTROUTING -o output -j MASQUERADE"', shell=True))
-    print(subprocess.call(
-        'sudo docker exec -i mn.nat /bin/bash -c "iptables -A FORWARD -i input -o output -j ACCEPT"', shell=True))
+    #print(subprocess.call(
+    #    'sudo docker exec -i mn.nat /bin/bash -c "iptables -t nat -A POSTROUTING -o output -j MASQUERADE"', shell=True))
+    #print(subprocess.call(
+    #    'sudo docker exec -i mn.nat /bin/bash -c "iptables -A FORWARD -i input -o output -j ACCEPT"', shell=True))
 
     # execute /start.sh script inside dummy-forwarder image. It bridges input
     # and output interfaces with br0 to enable packet forwarding.
-    #print(subprocess.call(
-    #    'sudo docker exec -i mn.fwdr /bin/bash -c "sh /start.sh"', shell=True))
-    # print('dummy-forwarder VNF started')
+    print(subprocess.call('sudo docker exec -i mn.nat /bin/bash /start.sh',
+                          shell=True))
+    print('NAT VNF started')
     print('ping client -> server before explicit chaining. Packet drop %s%%' %
           net.ping([client, server]))
 
     # chain 'client -> dummy-forwarder -> server'
-    net.setChain('client', 'fwdr', 'intf1', 'input', bidirectional=True,
+    net.setChain('client', 'nat', 'intf1', 'input', bidirectional=True,
                  cmd='add-flow')
-    net.setChain('fwdr', 'server', 'output', 'intf2', bidirectional=True,
+    net.setChain('nat', 'server', 'output', 'intf2', bidirectional=True,
                  cmd='add-flow')
 
     print('ping client -> server after explicit chaining. Packet drop %s%%' %
