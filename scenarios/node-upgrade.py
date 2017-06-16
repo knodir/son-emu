@@ -301,8 +301,79 @@ def runDummyForwarderOnly():
     net.CLI()
     net.stop()
 
-
 def runNATOnly():
+    """ Put NAT between client and server to check if packets sent
+    by client pass through NAT and reach the server. Here, each VNF is on a
+    separate data center connected with a switch. """
+
+    net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
+    # add 3 data centers
+    client_dc = net.addDatacenter('client-dc')
+    chain_dc = net.addDatacenter('chain-dc')
+    server_dc = net.addDatacenter('server-dc')
+
+    # connect data centers with switches
+    s1 = net.addSwitch('s1')
+    s2 = net.addSwitch('s2')
+
+    # link data centers and switches
+    net.addLink(client_dc, s1)
+    net.addLink(s1, chain_dc)
+    net.addLink(chain_dc, s2)
+    net.addLink(s2, server_dc)
+
+    # create REST API endpoint
+    api = RestApiEndpoint("0.0.0.0", 5001)
+
+    # connect API endpoint to containernet
+    api.connectDCNetwork(net)
+
+    # connect data centers to the endpoint
+    api.connectDatacenter(client_dc)
+    api.connectDatacenter(chain_dc)
+    api.connectDatacenter(server_dc)
+
+    # start API and containernet
+    api.start()
+    net.start()
+
+    # create client with one interface
+    client = client_dc.startCompute("client",
+                             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+
+    # create NAT VNF with two interfaces. Its 'input'
+    # interface faces the client and output interface the server VNF.
+    nat = chain_dc.startCompute("nat", image='knodir/nat',
+                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                                     {'id': 'output', 'ip': '10.0.10.4/24'}])
+
+    # create server VNF with one interface
+    server = server_dc.startCompute("server",
+                             network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
+
+    # add routing table entries on client and server
+    print(subprocess.call(
+        'sudo docker exec -i mn.client /bin/bash -c "route add -net 10.0.10.0/24 dev intf1"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "route add -net 10.0.0.0/24 dev intf2"', shell=True))
+
+    print(subprocess.call('sudo docker exec -i mn.nat /bin/bash /start.sh',
+                          shell=True))
+
+   # chain 'client -> nat -> server'
+    net.setChain('client', 'nat', 'intf1', 'input', bidirectional=True,
+                 cmd='add-flow')
+    net.setChain('nat', 'server', 'output', 'intf2', bidirectional=True,
+                 cmd='add-flow')
+
+    print('ping client -> server after explicit chaining. Packet drop %s%%' %
+          net.ping([client, server]))
+
+    net.CLI()
+    net.stop()
+
+
+def runNATOVSOnly():
     """ Put NAT between client and server to check if packets sent
     by client pass through NAT VNF and reach the server VNF on different subnet.
     Here, each VNF is on a separate data center connected with a switch. """
@@ -363,8 +434,8 @@ def runNATOnly():
     #print(subprocess.call(
     #    'sudo docker exec -i mn.nat /bin/bash -c "iptables -A FORWARD -i input -o output -j ACCEPT"', shell=True))
 
-    # execute /start.sh script inside dummy-forwarder image. It bridges input
-    # and output interfaces with br0 to enable packet forwarding.
+    # execute /start.sh script inside NAT image. It attaches both input
+    # and output interfaces to OVS bridge to enable packet forwarding.
     print(subprocess.call('sudo docker exec -i mn.nat /bin/bash /start.sh',
                           shell=True))
     print('NAT VNF started')
@@ -389,9 +460,22 @@ def runVPNOnly():
     by client passed through dummy-forwarder VNF and reach the server VNF. Here,
     each VNF is on a separate data center connected with a switch. """
 
+
     net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
     # add 3 data centers
-    dc = net.addDatacenter('dc1')
+    client_dc = net.addDatacenter('client-dc')
+    chain_dc = net.addDatacenter('chain-dc')
+    server_dc = net.addDatacenter('server-dc')
+
+    # connect data centers with switches
+    s1 = net.addSwitch('s1')
+    s2 = net.addSwitch('s2')
+
+    # link data centers and switches
+    net.addLink(client_dc, s1)
+    net.addLink(s1, chain_dc)
+    net.addLink(chain_dc, s2)
+    net.addLink(s2, server_dc)
 
     # create REST API endpoint
     api = RestApiEndpoint("0.0.0.0", 5001)
@@ -400,59 +484,61 @@ def runVPNOnly():
     api.connectDCNetwork(net)
 
     # connect data centers to the endpoint
-    api.connectDatacenter(dc)
+    api.connectDatacenter(client_dc)
+    api.connectDatacenter(chain_dc)
+    api.connectDatacenter(server_dc)
 
     # start API and containernet
     api.start()
     net.start()
 
     # create client with one interface
-    client = dc.startCompute("client",
+    client = client_dc.startCompute("client",
                              network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
 
-    # create dummy-forwarder (fwdr) VNF with two interfaces. Its 'input'
+    # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
-    fwdr = dc.startCompute("fwdr", image='knodir/vpn-client',
+    vpn = chain_dc.startCompute("vpn", image='knodir/nat',
                             network=[{'id': 'input', 'ip': '10.0.0.3/24'},
-                                     {'id': 'output', 'ip': '10.0.0.4/24'}])
+                                     {'id': 'output', 'ip': '10.0.10.4/24'}])
 
     # create server VNF with one interface
-    server = dc.startCompute("server", 
-                             network=[{'id': 'input', 'ip': '10.0.0.10/24'}])
-    print('ping client -> server before explicit chaining. Packet drop %s%%' %
-            net.ping([client, server]))
+    server = server_dc.startCompute("server", image='knodir/vpn-server',
+                             network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
 
-    # print(subprocess.call(
-    #     'sudo docker exec -i mn.client /bin/bash -c "route add -net 10.0.10.0/24 dev intf1"', shell=True))
-    # print(subprocess.call(
-    #     'sudo docker exec -i mn.server /bin/bash -c "route add -net 10.0.0.0/24 dev intf2"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.client /bin/bash -c "route add -net 10.0.10.0/24 dev intf1"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "route add -net 10.0.0.0/24 dev intf2"', shell=True))
 
-    # execute /start.sh script inside dummy-forwarder image. It bridges input
+    # execute /start.sh script inside VPN image. It bridges input
     # and output interfaces with br0 to enable packet forwarding.
-    #print(subprocess.call(
-    #    'sudo docker exec -i mn.fwdr /bin/bash -c "sh /start.sh"', shell=True))
-    #print('dummy-forwarder VNF started')
+    print(subprocess.call('sudo docker exec -i mn.vpn /bin/bash /start.sh',
+                          shell=True))
+    print('NAT VNF started')
+    print('ping client -> server before explicit chaining. Packet drop %s%%' %
+          net.ping([client, server]))
 
-    # print(subprocess.call(
-    #     'sudo docker exec -i mn.server /bin/bash -c "ufw enable"', shell=True))
-    # print(subprocess.call(
-    #     'sudo docker exec -i mn.server /bin/bash -c "ufw status"', shell=True))
-    # print(subprocess.call(
-    #     'sudo docker exec -i mn.server /bin/bash -c "service openvpn start"', shell=True))
-    # print(subprocess.call(
-    #     'sudo docker exec -i mn.server /bin/bash -c "service openvpn status"', shell=True))
-    # print(subprocess.call(
-    #     'sudo docker exec -i mn.server /bin/bash -c "service rsyslog start"', shell=True))
-    # print(subprocess.call(
-    #     'sudo docker exec -i mn.server /bin/bash -c "service rsyslog status"', shell=True))
-
-    print('server VNF started')
-
-    # chain 'client -> dummy-forwarder -> server'
-    net.setChain('client', 'fwdr', 'intf1', 'input', bidirectional=True,
+    # chain 'client -> vpn -> server'
+    net.setChain('client', 'vpn', 'intf1', 'input', bidirectional=True,
                  cmd='add-flow')
-    net.setChain('fwdr', 'server', 'output', 'input', bidirectional=True,
+    net.setChain('vpn', 'server', 'output', 'intf2', bidirectional=True,
                  cmd='add-flow')
+
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "ufw enable"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "ufw status"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "service openvpn start"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "service openvpn status"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "service rsyslog start"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "service rsyslog status"', shell=True))
+
+    print('VPN server VNF started')
 
     print('ping client -> server after explicit chaining. Packet drop %s%%' %
           net.ping([client, server]))
@@ -615,6 +701,7 @@ if __name__ == '__main__':
     # runFirewallOnly()
     # runVPNOnly()
     runNATOnly()
+    # runNATOVSOnly()
     # flatNet()
     # nodeUpgrade()
 
