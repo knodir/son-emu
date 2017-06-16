@@ -205,17 +205,17 @@ def runDummyForwarderOnly():
 
     # create client with one interface
     client = client_dc.startCompute("client",
-                             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+                                    network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
 
     # create dummy-forwarder (fwdr) VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     fwdr = chain_dc.startCompute("fwdr", image='knodir/dummy-forwarder',
-                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
-                                     {'id': 'output', 'ip': '10.0.0.4/24'}])
+                                 network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                                          {'id': 'output', 'ip': '10.0.0.4/24'}])
 
     # create server VNF with one interface
     server = server_dc.startCompute("server",
-                             network=[{'id': 'intf2', 'ip': '10.0.0.10/24'}])
+                                    network=[{'id': 'intf2', 'ip': '10.0.0.10/24'}])
 
     # execute /start.sh script inside dummy-forwarder image. It bridges input
     # and output interfaces with br0 to enable packet forwarding.
@@ -276,17 +276,17 @@ def runDummyForwarderOVSOnly():
 
     # create client with one interface
     client = client_dc.startCompute("client",
-                             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+                                    network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
 
     # create VNF with two interfaces. Its 'input' interface faces the client and
     # output interface the server VNF.
     fwdr = chain_dc.startCompute("fwdr", image='knodir/dummy-forwarder-ovs',
-                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
-                                     {'id': 'output', 'ip': '10.0.10.4/24'}])
+                                 network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                                          {'id': 'output', 'ip': '10.0.10.4/24'}])
 
     # create server VNF with one interface
     server = server_dc.startCompute("server",
-                             network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
+                                    network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
 
     print(subprocess.call(
         'sudo docker exec -i mn.client /bin/bash -c "route add -net 10.0.10.0/24 dev intf1"', shell=True))
@@ -352,17 +352,17 @@ def runNATOnly():
 
     # create client with one interface
     client = client_dc.startCompute("client",
-                             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+                                    network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
 
     # create NAT VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     nat = chain_dc.startCompute("nat", image='knodir/nat',
-                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
-                                     {'id': 'output', 'ip': '10.0.10.4/24'}])
+                                network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                                         {'id': 'output', 'ip': '10.0.10.4/24'}])
 
     # create server VNF with one interface
     server = server_dc.startCompute("server",
-                             network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
+                                    network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
 
     # add routing table entries on client and server
     print(subprocess.call(
@@ -425,7 +425,7 @@ def runVPNOnly():
 
     # create client with one interface
     client = client_dc.startCompute("client",
-                             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+                                    network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
 
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
@@ -435,7 +435,7 @@ def runVPNOnly():
 
     # create server VNF with one interface
     server = server_dc.startCompute("server", image='knodir/vpn-server',
-                             network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
+                                    network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
 
     print(subprocess.call(
         'sudo docker exec -i mn.client /bin/bash -c "route add -net 10.0.10.0/24 dev intf1"', shell=True))
@@ -507,25 +507,35 @@ def nodeUpgrade():
     # create client with one interface
     client = dc.startCompute("client",
                              network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
-
+    # create NAT VNF with two interfaces. Its 'input'
+    # interface faces the client and output interface the server VNF.
+    nat = dc.startCompute("nat", image='knodir/nat',
+                          network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                                   {'id': 'output', 'ip': '10.0.10.4/24'}])
     # create fw VNF with two interfaces. 'input' interface for 'client' and
     # 'output' interface for the 'snort' VNF.
     fw = dc.startCompute("fw", image='knodir/sonata-fw-vnf',
-                         network=[{'id': 'input', 'ip': '10.0.0.3/24'},
-                                  {'id': 'output', 'ip': '10.0.0.4/24'}])
+                         network=[{'id': 'input', 'ip': '10.0.0.5/24'},
+                                  {'id': 'output', 'ip': '10.0.0.6/24'}])
 
     # create snort VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
     snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
-                            network=[{'id': 'input', 'ip': '10.0.0.5/24'},
-                                     {'id': 'output', 'ip': '10.0.0.6/24'}])
+                            network=[{'id': 'input', 'ip': '10.0.0.7/24'},
+                                     {'id': 'output', 'ip': '10.0.0.8/24'}])
 
     # create server VNF with one interface
     server = dc.startCompute("server",
-                             network=[{'id': 'intf2', 'ip': '10.0.0.7/24'}])
+                             network=[{'id': 'intf2', 'ip': '10.0.10.9/24'}])
 
     print('ping client -> server before explicit chaining. Packet drop %s%%' %
           net.ping([client, server]))
+
+    # add routing table entries on client and server
+    print(subprocess.call(
+        'sudo docker exec -i mn.client /bin/bash -c "route add -net 10.0.10.0/24 dev intf1"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "route add -net 10.0.0.0/24 dev intf2"', shell=True))
 
     # execute /start.sh script inside firewall Docker image. It start Ryu
     # controller and OVS with proper configuration.
@@ -541,14 +551,21 @@ def nodeUpgrade():
     print(subprocess.call('sudo docker exec -i mn.snort /bin/bash -c "sh /start.sh"', shell=True))
     print('snort start done')
 
-    # chain 'client <-> fw <-> snort <-> server'
-    net.setChain('client', 'fw', 'intf1', 'input', bidirectional=True,
+    # execute /start.sh script inside nat image. It attaches both input
+    # and output interfaces to OVS bridge to enable packet forwarding.
+    print(subprocess.call('sudo docker exec -i mn.nat /bin/bash /start.sh',
+                          shell=True))
+    print('nat start done')
+
+    # chain 'client <-> nat <-> fw <-> snort <-> server'
+    net.setChain('client', 'nat', 'intf1', 'input', bidirectional=True,
+                 cmd='add-flow')
+    net.setChain('nat', 'fw', 'output', 'input', bidirectional=True,
                  cmd='add-flow')
     net.setChain('fw', 'snort', 'output', 'input', bidirectional=True,
                  cmd='add-flow')
     net.setChain('snort', 'server', 'output', 'intf2', bidirectional=True,
                  cmd='add-flow')
-
     # TODO(nodir): the first packet in the chain always drops. It is not because
     # of Ryu OpenFlow controller's traditional first-packet-drop behaviour since
     # the first packet does not fail when Firewall tried separately (in
@@ -562,70 +579,111 @@ def nodeUpgrade():
     net.stop()
 
 
-def flatNet():
-    "Create a network with some docker containers acting as hosts."
+def scaleOut():
+    """ TBD """
 
-    net = Containernet(controller=Controller)
+    net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
+    # add one data center
+    dc = net.addDatacenter('dc1', metadata={'node-upgrade'})
 
-    info('*** Adding controller\n')
-    net.addController('c0')
+    # create REST API endpoint
+    api = RestApiEndpoint("0.0.0.0", 5001)
 
-    info('*** Adding hosts\n')
-    # h1 = net.addHost('h1')
-    # h2 = net.addHost('h2')
+    # connect API endpoint to containernet
+    api.connectDCNetwork(net)
 
-    info('*** Adding docker containers\n')
-    d1 = net.addDocker('d1', ip='10.0.0.251', dimage="jasonish/snort")
-    d2 = net.addDocker('d2', ip='10.0.0.252', dimage="ubuntu:trusty", cpu_period=50000, cpu_quota=25000)
-    d3 = net.addHost(
-        'd3', ip='11.0.0.253', cls=Docker, dimage="ubuntu:trusty", cpu_shares=20)
-    # d5 = net.addDocker('d5', dimage="ubuntu:trusty", volumes=["/:/mnt/vol1:rw"])
+    # connect data centers to the endpoint
+    api.connectDatacenter(dc)
 
-    info('*** Adding switch\n')
-    s1 = net.addSwitch('s1')
-    s2 = net.addSwitch('s2', cls=OVSSwitch)
-    # s3 = net.addSwitch('s3')
-
-    info('*** Creating links\n')
-    net.addLink(d1, s1)
-    net.addLink(s1, d2)
-    net.addLink(d2, s2)
-    net.addLink(s2, d3)
-
-    # net.addLink(s1, d1)
-    # net.addLink(h2, s2)
-    # net.addLink(d2, s2)
-    # net.addLink(s1, s2)
-    # #net.addLink(s1, s2, cls=TCLink, delay="100ms", bw=1, loss=10)
-    # # try to add a second interface to a docker container
-    # net.addLink(d2, s3, params1={"ip": "11.0.0.254/8"})
-    # net.addLink(d3, s3)
-
-    info('*** Starting network\n')
+    # start API and containernet
+    api.start()
     net.start()
 
-    net.ping([d1, d2])
+    # create client with one interface
+    client = dc.startCompute("client",
+                             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+    # create NAT VNF with two interfaces. Its 'input'
+    # interface faces the client and output interface the server VNF.
+    nat = dc.startCompute("nat", image='knodir/nat',
+                          network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                                   {'id': 'output', 'ip': '10.0.10.4/24'}])
+    # create fw VNF with two interfaces. 'input' interface for 'client' and
+    # 'output' interface for the 'snort' VNF.
+    fw = dc.startCompute("fw", image='knodir/sonata-fw-vnf',
+                         network=[{'id': 'input', 'ip': '10.0.0.5/24'},
+                                  {'id': 'output', 'ip': '10.0.0.6/24'}])
 
-    # our extended ping functionality
-    # net.ping([d1], manualdestip="10.0.0.252")
-    # net.ping([d2, d3], manualdestip="11.0.0.254")
+    # create snort VNF with two interfaces. 'input' interface for 'fw' and
+    # 'output' interface for the 'server' VNF.
+    snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
+                            network=[{'id': 'input', 'ip': '10.0.0.7/24'},
+                                     {'id': 'output', 'ip': '10.0.0.8/24'}])
 
-    info('*** Dynamically add a container at runtime\n')
-    d4 = net.addDocker('d4', dimage="ubuntu:trusty")
-    # we have to specify a manual ip when we add a link at runtime
-    net.addLink(d4, s1, params1={"ip": "10.0.0.254/8"})
-    # other options to do this
-    # d4.defaultIntf().ifconfig("10.0.0.254 up")
-    # d4.setIP("10.0.0.254")
+    # create server VNF with one interface
+    server = dc.startCompute("server",
+                             network=[{'id': 'intf2', 'ip': '10.0.10.9/24'}])
 
-    # net.ping([d1], manualdestip="10.0.0.254")
+    print('ping client -> server before explicit chaining. Packet drop %s%%' %
+          net.ping([client, server]))
 
-    info('*** Running CLI\n')
-    CLI(net)
+    # add routing table entries on client and server
+    print(subprocess.call(
+        'sudo docker exec -i mn.client /bin/bash -c "route add -net 10.0.10.0/24 dev intf1"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "route add -net 10.0.0.0/24 dev intf2"', shell=True))
 
-    info('*** Stopping network')
+    # execute /start.sh script inside firewall Docker image. It start Ryu
+    # controller and OVS with proper configuration.
+    devnull = open(os.devnull, 'wb')
+    print(subprocess.call('sudo docker exec -i mn.fw /bin/bash /root/start.sh &', shell=True))
+    print('> sleeping 10s to wait ryu controller initialize')
+    time.sleep(10)
+    print('< wait complete')
+    print('fw start done')
+
+    # execute /start.sh script inside snort image. It bridges input and output
+    # interfaces with br0, and starts snort process listering on br0.
+    print(subprocess.call('sudo docker exec -i mn.snort /bin/bash -c "sh /start.sh"', shell=True))
+    print('snort start done')
+
+    # execute /start.sh script inside nat image. It attaches both input
+    # and output interfaces to OVS bridge to enable packet forwarding.
+    print(subprocess.call('sudo docker exec -i mn.nat /bin/bash /start.sh',
+                          shell=True))
+    print('nat start done')
+
+    # chain 'client <-> nat <-> fw <-> snort <-> server'
+    net.setChain('client', 'nat', 'intf1', 'input', bidirectional=True,
+                 cmd='add-flow')
+    net.setChain('nat', 'fw', 'output', 'input', bidirectional=True,
+                 cmd='add-flow')
+    net.setChain('fw', 'snort', 'output', 'input', bidirectional=True,
+                 cmd='add-flow')
+    net.setChain('snort', 'server', 'output', 'intf2', bidirectional=True,
+                 cmd='add-flow')
+
+    print('ping client -> server after explicit chaining. Packet drop %s%%' %
+          net.ping([client, server], timeout=5))
+    # The native mininet function does not work, we are missing telnet.
+    # print('bandwidth client -> server after explicit chaining. Packet drop %s%%' %
+    #       net.iperf([client, server]))
+
+    # test iPerf
+    # print(subprocess.call('sudo docker exec -i mn.server /bin/bash -c "iperf3 -s"', shell=True))
+    # print(subprocess.call('sudo docker exec -i mn.client /bin/bash -c "iperf3 -c 10.0.10.9 -t 10"', shell=True))
+
+    links = net.links
+    for l in links:
+        print(l)
+        l.intf1.config(**{'bw': 1})
+        l.intf2.config(**{'bw': 1})
+
+
+    # test iPerf
+    # print(subprocess.call('sudo docker exec -i mn.server /bin/bash -c "iperf3 -s"', shell=True))
+    # print(subprocess.call('sudo docker exec -i mn.client /bin/bash -c "iperf3 -c 10.0.10.9 -t 10"', shell=True))
+    net.CLI()
     net.stop()
-
 
 if __name__ == '__main__':
     # runSDNChainingMultiService()
@@ -639,6 +697,6 @@ if __name__ == '__main__':
     # runNATOnly()
     runVPNOnly()
     # flatNet()
-    # nodeUpgrade()
-
+    nodeUpgrade()
+    # scaleOut()
     cleanup()
