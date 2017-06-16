@@ -470,8 +470,7 @@ def runVPNOnly():
     print('> sleeping 60s to VPN client initialize...')
     time.sleep(60)
     print('< wait complete')
- 
-    print('NAT VNF started')
+    print('VPN client VNF started')
 
     print(subprocess.call(
         'sudo docker exec -i mn.client /bin/bash -c "ip route add 10.8.0.1/32 dev intf1"', shell=True))
@@ -523,9 +522,15 @@ def nodeUpgrade():
                             network=[{'id': 'input', 'ip': '10.0.0.7/24'},
                                      {'id': 'output', 'ip': '10.0.0.8/24'}])
 
+    # create VPN VNF with two interfaces. Its 'input'
+    # interface faces the client and output interface the server VNF.
+    vpn = dc.startCompute("vpn", image='knodir/vpn-client',
+                            network=[{'id': 'input', 'ip': '10.0.0.9/24'},
+                                     {'id': 'output', 'ip': '10.0.10.5/24'}])
+
     # create server VNF with one interface
-    server = dc.startCompute("server",
-                             network=[{'id': 'intf2', 'ip': '10.0.10.9/24'}])
+    server = dc.startCompute("server", image='knodir/vpn-server',
+                                    network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
 
     print('ping client -> server before explicit chaining. Packet drop %s%%' %
           net.ping([client, server]))
@@ -555,20 +560,44 @@ def nodeUpgrade():
                           shell=True))
     print('nat start done')
 
-    # chain 'client <-> nat <-> fw <-> snort <-> server'
+    # chain 'client <-> nat <-> fw <-> snort <-> vpn <-> server'
     net.setChain('client', 'nat', 'intf1', 'input', bidirectional=True,
                  cmd='add-flow')
     net.setChain('nat', 'fw', 'output', 'input', bidirectional=True,
                  cmd='add-flow')
     net.setChain('fw', 'snort', 'output', 'input', bidirectional=True,
                  cmd='add-flow')
-    net.setChain('snort', 'server', 'output', 'intf2', bidirectional=True,
+    net.setChain('snort', 'vpn', 'output', 'input', bidirectional=True,
+                 cmd='add-flow')
+    net.setChain('vpn', 'server', 'output', 'intf2', bidirectional=True,
                  cmd='add-flow')
     # TODO(nodir): the first packet in the chain always drops. It is not because
     # of Ryu OpenFlow controller's traditional first-packet-drop behaviour since
     # the first packet does not fail when Firewall tried separately (in
     # runFirewallOnly()). Sleeping extra 5s before ping does not help. Find out
     # why it happens.
+
+    # start openvpn server and related services inside the openvpn server
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "ufw enable"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "ufw status"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "service openvpn start"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "service openvpn status"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "service rsyslog start"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "service rsyslog status"', shell=True))
+
+    # execute /start.sh script inside VPN client.
+    print(subprocess.call('sudo docker exec -i mn.vpn /bin/bash /start.sh &',
+                          shell=True))
+    print('> sleeping 60s to VPN client initialize...')
+    time.sleep(60)
+    print('< wait complete')
+    print('VPN client VNF started')
 
     print('ping client -> server after explicit chaining. Packet drop %s%%' %
           net.ping([client, server], timeout=5))
@@ -586,7 +615,6 @@ if __name__ == '__main__':
     # runIDSOnly()
     # runFirewallOnly()
     # runNATOnly()
-    runVPNOnly()
-    # flatNet()
-    # nodeUpgrade()
+    # runVPNOnly()
+    nodeUpgrade()
     cleanup()
