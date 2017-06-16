@@ -13,8 +13,8 @@ RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -
 # move tcpdump from sbin to slience apparmor
 RUN mv /usr/sbin/tcpdump /usr/local/bin/
 
-CMD service rsyslog restart
-CMD service openvpn start
+ADD start.sh start.sh
+RUN chmod +x start.sh
 
 # normal entry point
 CMD /bin/bash
