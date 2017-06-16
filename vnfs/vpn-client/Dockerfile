@@ -1,20 +1,14 @@
-FROM ubuntu:trusty
+FROM      ubuntu:trusty
 MAINTAINER nodir.qodirov@gmail.com
 
-# define interface names (should be the same as in VNFD)
-ENV IFIN input
-ENV IFOUT output
+# slightly modified version of sonatanfv/sonata-fw-vnf
 
-RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y -q \
+RUN	apt-get update && apt-get install -y \
 	net-tools \
 	iproute \
+  iptables \
 	inetutils-ping \
-	iptables \
-	arptables \
-	ebtables \
-	bridge-utils \
-	ethtool \
-	vim \
+  vim \
   tcpdump \
   openvpn
 
@@ -23,9 +17,9 @@ RUN mv /usr/sbin/tcpdump /usr/local/bin/
 
 ADD start.sh start.sh
 RUN chmod +x start.sh
+ADD client.ovpn client.ovpn
 
 # set entry point for emulator gatekeeper
-ENV SON_EMU_CMD ./start.sh
+ENV SON_EMU_CMD "./start.sh"
 
-# normal entry point
 CMD /bin/bash
