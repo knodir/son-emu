@@ -423,7 +423,7 @@ def runVPNOnly():
     net.start()
 
     # create client with one interface
-    client = client_dc.startCompute("client",
+    client = client_dc.startCompute("client", image='knodir/client',
                                     network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
 
     # create VPN VNF with two interfaces. Its 'input'
@@ -483,7 +483,7 @@ def runVPNOnly():
 
 
 def nodeUpgrade():
-    """ TBD """
+    """ Implements node-upgrade scenario. TBD. """
 
     net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
     # add one data center
@@ -503,47 +503,43 @@ def nodeUpgrade():
     net.start()
 
     # create client with one interface
-    client = dc.startCompute("client",
-                             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+    client = dc.startCompute("client", image='knodir/client',
+            network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
     # create NAT VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     nat = dc.startCompute("nat", image='knodir/nat',
-                          network=[{'id': 'input', 'ip': '10.0.0.3/24'},
-                                   {'id': 'output', 'ip': '10.0.10.4/24'}])
+            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                {'id': 'output', 'ip': '10.0.1.4/24'}])
     # create fw VNF with two interfaces. 'input' interface for 'client' and
     # 'output' interface for the 'snort' VNF.
     fw = dc.startCompute("fw", image='knodir/sonata-fw-vnf',
-                         network=[{'id': 'input', 'ip': '10.0.0.5/24'},
-                                  {'id': 'output', 'ip': '10.0.0.6/24'}])
+            network=[{'id': 'input', 'ip': '10.0.1.5/24'},
+                {'id': 'output', 'ip': '10.0.1.6/24'}])
 
     # create snort VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
     snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
-                            network=[{'id': 'input', 'ip': '10.0.0.7/24'},
-                                     {'id': 'output', 'ip': '10.0.0.8/24'}])
+            network=[{'id': 'input', 'ip': '10.0.1.7/24'},
+                {'id': 'output', 'ip': '10.0.1.8/24'}])
 
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     vpn = dc.startCompute("vpn", image='knodir/vpn-client',
-                            network=[{'id': 'input', 'ip': '10.0.0.9/24'},
-                                     {'id': 'output', 'ip': '10.0.10.5/24'}])
+            network=[{'id': 'input', 'ip': '10.0.1.9/24'},
+                {'id': 'output', 'ip': '10.0.10.2/24'}])
 
     # create server VNF with one interface
     server = dc.startCompute("server", image='knodir/vpn-server',
-                                    network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
+            network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
 
     print('ping client -> server before explicit chaining. Packet drop %s%%' %
           net.ping([client, server]))
 
-    # add routing table entries on client and server
-    print(subprocess.call(
-        'sudo docker exec -i mn.client /bin/bash -c "route add -net 10.0.10.0/24 dev intf1"', shell=True))
-    print(subprocess.call(
-        'sudo docker exec -i mn.server /bin/bash -c "route add -net 10.0.0.0/24 dev intf2"', shell=True))
-
-    # execute /start.sh script inside firewall Docker image. It start Ryu
+    # execute /start.sh script inside firewall Docker image. It starts Ryu
     # controller and OVS with proper configuration.
-    print(subprocess.call('sudo docker exec -i mn.fw /bin/bash /root/start.sh &', shell=True))
+    cmd = 'sudo docker exec -i mn.fw /bin/bash /root/start.sh &'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from fw start.sh start (0 is success)' % execStatus)
     print('> sleeping 10s to wait ryu controller initialize')
     time.sleep(10)
     print('< wait complete')
@@ -551,14 +547,15 @@ def nodeUpgrade():
 
     # execute /start.sh script inside snort image. It bridges input and output
     # interfaces with br0, and starts snort process listering on br0.
-    print(subprocess.call('sudo docker exec -i mn.snort /bin/bash -c "sh /start.sh"', shell=True))
-    print('snort start done')
+    cmd = 'sudo docker exec -i mn.snort /bin/bash -c "sh /start.sh"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from snort start.sh start (0 is success)' % execStatus)
 
     # execute /start.sh script inside nat image. It attaches both input
     # and output interfaces to OVS bridge to enable packet forwarding.
-    print(subprocess.call('sudo docker exec -i mn.nat /bin/bash /start.sh',
-                          shell=True))
-    print('nat start done')
+    cmd = 'sudo docker exec -i mn.nat /bin/bash /start.sh'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from nat start.sh start (0 is success)' % execStatus)
 
     # chain 'client <-> nat <-> fw <-> snort <-> vpn <-> server'
     net.setChain('client', 'nat', 'intf1', 'input', bidirectional=True,
@@ -571,33 +568,57 @@ def nodeUpgrade():
                  cmd='add-flow')
     net.setChain('vpn', 'server', 'output', 'intf2', bidirectional=True,
                  cmd='add-flow')
-    # TODO(nodir): the first packet in the chain always drops. It is not because
-    # of Ryu OpenFlow controller's traditional first-packet-drop behaviour since
-    # the first packet does not fail when Firewall tried separately (in
-    # runFirewallOnly()). Sleeping extra 5s before ping does not help. Find out
-    # why it happens.
 
-    # start openvpn server and related services inside the openvpn server
-    print(subprocess.call(
-        'sudo docker exec -i mn.server /bin/bash -c "ufw enable"', shell=True))
-    print(subprocess.call(
-        'sudo docker exec -i mn.server /bin/bash -c "ufw status"', shell=True))
-    print(subprocess.call(
-        'sudo docker exec -i mn.server /bin/bash -c "service openvpn start"', shell=True))
-    print(subprocess.call(
-        'sudo docker exec -i mn.server /bin/bash -c "service openvpn status"', shell=True))
-    print(subprocess.call(
-        'sudo docker exec -i mn.server /bin/bash -c "service rsyslog start"', shell=True))
-    print(subprocess.call(
-        'sudo docker exec -i mn.server /bin/bash -c "service rsyslog status"', shell=True))
+    # start openvpn server and related services inside openvpn server
+    cmd = 'sudo docker exec -i mn.server /bin/bash -c "ufw enable"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from server ufw enable (0 is success)' % execStatus)
 
-    # execute /start.sh script inside VPN client.
-    print(subprocess.call('sudo docker exec -i mn.vpn /bin/bash /start.sh &',
-                          shell=True))
+    cmd = 'sudo docker exec -i mn.server /bin/bash -c "ufw status"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from server ufw status (0 is success)' % execStatus)
+
+    cmd = 'sudo docker exec -i mn.server /bin/bash -c "service openvpn start"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from server openvpn start (0 is success)' % execStatus)
+
+    cmd = 'sudo docker exec -i mn.server /bin/bash -c "service openvpn status"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from server openvpn status (0 is success)' % execStatus)
+
+    cmd = 'sudo docker exec -i mn.server /bin/bash -c "service rsyslog start"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from server rsyslog start (0 is success)' % execStatus)
+
+    cmd = 'sudo docker exec -i mn.server /bin/bash -c "service rsyslog status"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from server rsyslog status (0 is success)' % execStatus)
+
+    # execute /start.sh script inside VPN client to connect to VPN server.
+    cmd = 'sudo docker exec -i mn.vpn /bin/bash /start.sh &'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from vpn start.sh start (0 is success)' % execStatus)
     print('> sleeping 60s to VPN client initialize...')
     time.sleep(60)
     print('< wait complete')
     print('VPN client VNF started')
+
+    # manually add routing table entries on VNFs
+    cmd = 'sudo docker exec -i mn.client /bin/bash -c "route add -net 10.0.0.0/16 dev intf1"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from route add to client (0 is success)' % execStatus)
+
+    cmd = 'sudo docker exec -i mn.nat /bin/bash -c "route add -net 10.0.10.0/24 dev output"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from route add to nat (0 is success)' % execStatus)
+
+    cmd = 'sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from route add to VPN (0 is success)' % execStatus)
+
+    cmd = 'sudo docker exec -i mn.server /bin/bash -c "route add -net 10.0.0.0/24 dev intf2"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from route add to server (0 is success)' % execStatus)
 
     print('ping client -> server after explicit chaining. Packet drop %s%%' %
           net.ping([client, server], timeout=5))
