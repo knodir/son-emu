@@ -8,7 +8,8 @@ RUN	apt-get update && apt-get install -y \
 	iproute \
 	inetutils-ping \
   vim \
-  tcpdump
+  tcpdump \
+  iperf3
 
 # install OpenvSwitch 
 RUN apt-get install -y openvswitch-switch openvswitch-common
