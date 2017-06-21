@@ -50,122 +50,6 @@ def basicTest():
     net.stop()
 
 
-def runIDSOnly():
-    """ Put IDS between client and server to test its basic functionality. All
-    VNFs reside on a single DC. """
-
-    net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
-    # add one data center
-    dc = net.addDatacenter('dc1', metadata={'node-upgrade'})
-
-    # create REST API endpoint
-    api = RestApiEndpoint("0.0.0.0", 5001)
-
-    # connect API endpoint to containernet
-    api.connectDCNetwork(net)
-
-    # connect data centers to the endpoint
-    api.connectDatacenter(dc)
-
-    # start API and containernet
-    api.start()
-    net.start()
-
-    # create client with one interface
-    client = dc.startCompute("client",
-                             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
-
-    # create snort VNF with two interfaces. 'input' interface for 'client' and
-    # 'output' interface for the 'server' VNF.
-    snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
-                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
-                                     {'id': 'output', 'ip': '10.0.0.4/24'}])
-
-    # create server VNF with one interface
-    server = dc.startCompute("server",
-                             network=[{'id': 'intf2', 'ip': '10.0.0.5/24'}])
-    print('ping client -> server before explicit chaining. Packet drop %s%%' %
-          net.ping([client, server]))
-
-    # execute /start.sh script inside snort image. It bridges input and output
-    # interfaces with br0, and starts snort process listering on br0.
-    print(subprocess.call('sudo docker exec -i mn.snort /bin/bash -c "sh /start.sh"', shell=True))
-    print('snort start done')
-
-    # chain 'client -> snort -> server'
-    net.setChain('client', 'snort', 'intf1', 'input', bidirectional=True,
-                 cmd='add-flow')
-    net.setChain('snort', 'server', 'output', 'intf2', bidirectional=True,
-                 cmd='add-flow')
-
-    print('ping client -> server after explicit chaining. Packet drop %s%%' %
-          net.ping([client, server]))
-
-    # we currently do not need this
-    net.CLI()
-    net.stop()
-
-
-def runFirewallOnly():
-    """ Put Firewall between client and server to test its basic functionality.
-    All VNFs reside on a single DC. """
-
-    net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
-    # add one data center
-    dc = net.addDatacenter('dc1', metadata={'node-upgrade'})
-
-    # create REST API endpoint
-    api = RestApiEndpoint("0.0.0.0", 5001)
-
-    # connect API endpoint to containernet
-    api.connectDCNetwork(net)
-
-    # connect data centers to the endpoint
-    api.connectDatacenter(dc)
-
-    # start API and containernet
-    api.start()
-    net.start()
-
-    # create client with one interface
-    client = dc.startCompute("client",
-                             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
-
-    # create Firewall VNF with two interfaces. 'input' interface for 'client'
-    # and 'output' interface for the 'server' VNF.
-    fw = dc.startCompute("fw", image='knodir/sonata-fw-vnf',
-                         network=[{'id': 'input', 'ip': '10.0.0.3/24'},
-                                  {'id': 'output', 'ip': '10.0.0.4/24'}])
-
-    # create server VNF with one interface
-    server = dc.startCompute("server",
-                             network=[{'id': 'intf2', 'ip': '10.0.0.5/24'}])
-    print('ping client -> server before explicit chaining. Packet drop %s%%' %
-          net.ping([client, server]))
-
-    # execute /start.sh script inside firewall Docker image. It start Ryu
-    # controller and OVS with proper configuration.
-    print(subprocess.call('sudo docker exec -i mn.fw /bin/bash /root/start.sh &',
-                          shell=True))
-    print('fw start done')
-
-    print('> sleeping 10s to wait ryu controller initialize')
-    time.sleep(10)
-    print('< wait complete')
-
-    # chain 'client -> fw -> server'
-    net.setChain('client', 'fw', 'intf1', 'input', bidirectional=True,
-                 cmd='add-flow')
-    net.setChain('fw', 'server', 'output', 'intf2', bidirectional=True,
-                 cmd='add-flow')
-
-    print('ping client -> server after explicit chaining. Packet drop %s%%' %
-          net.ping([client, server]))
-
-    net.CLI()
-    net.stop()
-
-
 def runDummyForwarderOnly():
     """ Put Dummy-Forwarder between client and server to check if packets sent
     by client passed through dummy-forwarder VNF and reach the server VNF. Here,
@@ -385,6 +269,123 @@ def runNATOnly():
     net.stop()
 
 
+def runFirewallOnly():
+    """ Put Firewall between client and server to test its basic functionality.
+    All VNFs reside on a single DC. """
+
+    net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
+    # add one data center
+    dc = net.addDatacenter('dc1', metadata={'node-upgrade'})
+
+    # create REST API endpoint
+    api = RestApiEndpoint("0.0.0.0", 5001)
+
+    # connect API endpoint to containernet
+    api.connectDCNetwork(net)
+
+    # connect data centers to the endpoint
+    api.connectDatacenter(dc)
+
+    # start API and containernet
+    api.start()
+    net.start()
+
+    # create client with one interface
+    client = dc.startCompute("client",
+                             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+
+    # create Firewall VNF with two interfaces. 'input' interface for 'client'
+    # and 'output' interface for the 'server' VNF.
+    fw = dc.startCompute("fw", image='knodir/sonata-fw-vnf',
+                         network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                                  {'id': 'output', 'ip': '10.0.0.4/24'}])
+
+    # create server VNF with one interface
+    server = dc.startCompute("server",
+                             network=[{'id': 'intf2', 'ip': '10.0.0.5/24'}])
+    print('ping client -> server before explicit chaining. Packet drop %s%%' %
+          net.ping([client, server]))
+
+    # execute /start.sh script inside firewall Docker image. It start Ryu
+    # controller and OVS with proper configuration.
+    print(subprocess.call('sudo docker exec -i mn.fw /bin/bash /root/start.sh &',
+                          shell=True))
+    print('fw start done')
+
+    print('> sleeping 10s to wait ryu controller initialize')
+    time.sleep(10)
+    print('< wait complete')
+
+    # chain 'client -> fw -> server'
+    net.setChain('client', 'fw', 'intf1', 'input', bidirectional=True,
+                 cmd='add-flow')
+    net.setChain('fw', 'server', 'output', 'intf2', bidirectional=True,
+                 cmd='add-flow')
+
+    print('ping client -> server after explicit chaining. Packet drop %s%%' %
+          net.ping([client, server]))
+
+    net.CLI()
+    net.stop()
+
+
+def runIDSOnly():
+    """ Put IDS between client and server to test its basic functionality. All
+    VNFs reside on a single DC. """
+
+    net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
+    # add one data center
+    dc = net.addDatacenter('dc1', metadata={'node-upgrade'})
+
+    # create REST API endpoint
+    api = RestApiEndpoint("0.0.0.0", 5001)
+
+    # connect API endpoint to containernet
+    api.connectDCNetwork(net)
+
+    # connect data centers to the endpoint
+    api.connectDatacenter(dc)
+
+    # start API and containernet
+    api.start()
+    net.start()
+
+    # create client with one interface
+    client = dc.startCompute("client", image='knodir/client',
+                             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+
+    # create snort VNF with two interfaces. 'input' interface for 'client' and
+    # 'output' interface for the 'server' VNF.
+    # snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
+    snort = dc.startCompute("snort", image='knodir/snort-xenial',
+                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                                     {'id': 'output', 'ip': '10.0.0.4/24'}])
+
+    # create server VNF with one interface
+    server = dc.startCompute("server", image='knodir/vpn-server',
+                             network=[{'id': 'intf2', 'ip': '10.0.0.5/24'}])
+    print('ping client -> server before explicit chaining. Packet drop %s%%' %
+          net.ping([client, server]))
+
+    # execute /start.sh script inside snort image. It bridges input and output
+    # interfaces with br0, and starts snort process listering on br0.
+    print(subprocess.call('sudo docker exec -i mn.snort /bin/bash -c "sh /start.sh"', shell=True))
+    print('snort start done')
+
+    # chain 'client -> snort -> server'
+    net.setChain('client', 'snort', 'intf1', 'input', bidirectional=True,
+                 cmd='add-flow')
+    net.setChain('snort', 'server', 'output', 'intf2', bidirectional=True,
+                 cmd='add-flow')
+
+    print('ping client -> server after explicit chaining. Packet drop %s%%' %
+          net.ping([client, server]))
+
+    # we currently do not need this
+    net.CLI()
+    net.stop()
+
+
 def runVPNOnly():
     """ Test VPN VNF by putting it between client and server and check if
     packets pass through VPN VNF and reach the server VNF. Here, each VNF is on
@@ -424,17 +425,17 @@ def runVPNOnly():
 
     # create client with one interface
     client = client_dc.startCompute("client", image='knodir/client',
-                                    network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+            network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
 
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     vpn = chain_dc.startCompute("vpn", image='knodir/vpn-client',
-                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
-                                     {'id': 'output', 'ip': '10.0.10.4/24'}])
+            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                {'id': 'output', 'ip': '10.0.10.4/24'}])
 
     # create server VNF with one interface
     server = server_dc.startCompute("server", image='knodir/vpn-server',
-                                    network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
+            network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
 
     print(subprocess.call(
         'sudo docker exec -i mn.client /bin/bash -c "route add -net 10.0.10.0/24 dev intf1"', shell=True))
@@ -453,6 +454,8 @@ def runVPNOnly():
     # start openvpn server and related services inside the server
     print(subprocess.call(
         'sudo docker exec -i mn.server /bin/bash -c "ufw enable"', shell=True))
+    print(subprocess.call(
+        'sudo docker exec -i mn.server /bin/bash -c "ufw allow 5201"', shell=True))
     print(subprocess.call(
         'sudo docker exec -i mn.server /bin/bash -c "ufw status"', shell=True))
     print(subprocess.call(
@@ -518,7 +521,8 @@ def nodeUpgrade():
                 {'id': 'output', 'ip': '10.0.1.6/24'}])
     # create snort VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
-    snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
+    # snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
+    snort = dc.startCompute("snort", image='knodir/snort-trusty',
             network=[{'id': 'input', 'ip': '10.0.1.7/24'},
                 {'id': 'output', 'ip': '10.0.1.8/24'}])
     # create VPN VNF with two interfaces. Its 'input'
@@ -635,9 +639,9 @@ if __name__ == '__main__':
     # basicTest()
     # runDummyForwarderOnly()
     # runDummyForwarderOVSOnly()
-    # runIDSOnly()
-    # runFirewallOnly()
     # runNATOnly()
+    # runFirewallOnly()
+    # runIDSOnly()
     # runVPNOnly()
     nodeUpgrade()
     cleanup()
