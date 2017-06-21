@@ -511,27 +511,24 @@ def nodeUpgrade():
             network=[{'id': 'input', 'ip': '10.0.0.3/24'},
                 {'id': 'output', 'ip': '10.0.1.4/24'}])
     # create fw VNF with two interfaces. 'input' interface for 'client' and
-    # 'output' interface for the 'snort' VNF.
+    # 'output' interface for the 'snort' VNF. Both interfaces are bridged to
+    # ovs1 bridge. knodir/sonata-fw-vnf has OVS and Ryu controller.
     fw = dc.startCompute("fw", image='knodir/sonata-fw-vnf',
             network=[{'id': 'input', 'ip': '10.0.1.5/24'},
                 {'id': 'output', 'ip': '10.0.1.6/24'}])
-
     # create snort VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
     snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
             network=[{'id': 'input', 'ip': '10.0.1.7/24'},
                 {'id': 'output', 'ip': '10.0.1.8/24'}])
-
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     vpn = dc.startCompute("vpn", image='knodir/vpn-client',
             network=[{'id': 'input', 'ip': '10.0.1.9/24'},
                 {'id': 'output', 'ip': '10.0.10.2/24'}])
-
     # create server VNF with one interface
     server = dc.startCompute("server", image='knodir/vpn-server',
             network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
-
     print('ping client -> server before explicit chaining. Packet drop %s%%' %
           net.ping([client, server]))
 
@@ -573,6 +570,11 @@ def nodeUpgrade():
     cmd = 'sudo docker exec -i mn.server /bin/bash -c "ufw enable"'
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from server ufw enable (0 is success)' % execStatus)
+
+    # open iperf3 port (5201) on firewall (ufw)
+    cmd = 'sudo docker exec -i mn.server /bin/bash -c "ufw allow 5201"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from server ufw allow 5201 (0 is success)' % execStatus)
 
     cmd = 'sudo docker exec -i mn.server /bin/bash -c "ufw status"'
     execStatus = subprocess.call(cmd, shell=True)
