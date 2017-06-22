@@ -291,7 +291,7 @@ def runFirewallOnly():
     net.start()
 
     # create client with one interface
-    client = dc.startCompute("client",
+    client = dc.startCompute("client", image='sonatanfv/sonata-iperf3-vnf',
                              network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
 
     # create Firewall VNF with two interfaces. 'input' interface for 'client'
@@ -301,7 +301,7 @@ def runFirewallOnly():
                                   {'id': 'output', 'ip': '10.0.0.4/24'}])
 
     # create server VNF with one interface
-    server = dc.startCompute("server",
+    server = dc.startCompute("server", image='sonatanfv/sonata-iperf3-vnf',
                              network=[{'id': 'intf2', 'ip': '10.0.0.5/24'}])
     print('ping client -> server before explicit chaining. Packet drop %s%%' %
           net.ping([client, server]))
@@ -640,8 +640,8 @@ if __name__ == '__main__':
     # runDummyForwarderOnly()
     # runDummyForwarderOVSOnly()
     # runNATOnly()
-    # runFirewallOnly()
+    runFirewallOnly()
     # runIDSOnly()
     # runVPNOnly()
-    nodeUpgrade()
+    # nodeUpgrade()
     cleanup()
