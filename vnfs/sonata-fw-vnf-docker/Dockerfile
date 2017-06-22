@@ -11,6 +11,9 @@ RUN	apt-get update && apt-get install -y \
   tcpdump \
   iperf3
 
+# EXPOSE 5201
+# EXPOSE 15201
+
 # install OpenvSwitch 
 RUN apt-get install -y openvswitch-switch openvswitch-common
 
@@ -19,7 +22,6 @@ RUN mv /usr/sbin/tcpdump /usr/local/bin/
 
 ADD start_fw.sh start.sh
 RUN chmod +x start.sh
-
 
 # set entry point for emulator gatekeeper
 ENV SON_EMU_CMD "./start.sh"

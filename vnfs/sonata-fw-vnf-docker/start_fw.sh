@@ -21,7 +21,8 @@ declare -a PORTS=("input" "output")
 
 echo "setup ovs bridge"
 ovs-vsctl add-br $NAME
-ovs-vsctl set bridge $NAME datapath_type=netdev
+echo "skipping datapath setup"
+# ovs-vsctl set bridge $NAME datapath_type=netdev
 ovs-vsctl set bridge $NAME protocols=OpenFlow10,OpenFlow12,OpenFlow13
 ovs-vsctl set-fail-mode $NAME secure
 ovs-vsctl set bridge $NAME other_config:disable-in-band=true
