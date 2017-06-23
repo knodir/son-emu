@@ -530,7 +530,12 @@ def nodeUpgrade():
     vpn = dc.startCompute("vpn", image='knodir/vpn-client',
             network=[{'id': 'input', 'ip': '10.0.1.9/24'},
                 {'id': 'output', 'ip': '10.0.10.2/24'}])
-    # create server VNF with one interface
+    # create server VNF with one interface. Do not change assigned 10.0.10.10/24
+    # address of the server. It is the address VPN clients use to connect to the
+    # server and this address is hardcoded inside client.ovpn of the vpn-client
+    # Docker image. We also remove the injected routing table entry for this
+    # address. So, if you change this address make sure it is changed inside
+    # client.ovpn file as well as subprocess mn.vpn route injection call below.
     server = dc.startCompute("server", image='knodir/vpn-server',
             network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
     print('ping client -> server before explicit chaining. Packet drop %s%%' %
@@ -614,13 +619,25 @@ def nodeUpgrade():
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from route add to client (0 is success)' % execStatus)
 
+    cmd = 'sudo docker exec -i mn.client /bin/bash -c "route add -net 10.8.0.0/24 dev intf1"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from route add to client (0 is success)' % execStatus)
+
     cmd = 'sudo docker exec -i mn.nat /bin/bash -c "route add -net 10.0.10.0/24 dev output"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from route add to nat (0 is success)' % execStatus)
+
+    cmd = 'sudo docker exec -i mn.nat /bin/bash -c "ip route add 10.8.0.0/24 dev output"'
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from route add to nat (0 is success)' % execStatus)
 
     cmd = 'sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input"'
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from route add to VPN (0 is success)' % execStatus)
+
+    cmd = 'sudo docker exec -i mn.vpn /bin/bash -c "ip route del 10.0.10.10/32"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from route del to VPN (0 is success)' % execStatus)
 
     cmd = 'sudo docker exec -i mn.server /bin/bash -c "route add -net 10.0.0.0/24 dev intf2"'
     execStatus = subprocess.call(cmd, shell=True)
@@ -640,8 +657,8 @@ if __name__ == '__main__':
     # runDummyForwarderOnly()
     # runDummyForwarderOVSOnly()
     # runNATOnly()
-    runFirewallOnly()
+    # runFirewallOnly()
     # runIDSOnly()
     # runVPNOnly()
-    # nodeUpgrade()
+    nodeUpgrade()
     cleanup()
