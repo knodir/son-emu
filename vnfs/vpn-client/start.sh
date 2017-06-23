@@ -23,9 +23,10 @@ echo "execute ifconfig to see interface"
 ifconfig
 echo "execute route -n to see routing table"
 route -n
-echo "delete routing entry for server main IP address"
-ip route del 10.0.10.10/32
-echo "execute route -n to see routing table"
-route -n
+
+echo "enable MASQUERADE for VPN tun0 interface"
+iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
+iptables -A FORWARD -i tun0 -o input -m state --state RELATED,ESTABLISHED -j ACCEPT
+iptables -A FORWARD -i input -o tun0 -j ACCEPT
 
 echo "VPN client VNF ready."
