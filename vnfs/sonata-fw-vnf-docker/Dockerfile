@@ -9,7 +9,8 @@ RUN	apt-get update && apt-get install -y \
 	inetutils-ping \
   vim \
   tcpdump \
-  iperf3
+  iperf3 \
+  dstat
 
 # install OpenvSwitch 
 RUN apt-get install -y openvswitch-switch openvswitch-common
@@ -19,6 +20,8 @@ RUN mv /usr/sbin/tcpdump /usr/local/bin/
 
 ADD start_fw.sh start.sh
 RUN chmod +x start.sh
+
+ADD dstat /usr/bin/dstat
 
 # set entry point for emulator gatekeeper
 ENV SON_EMU_CMD "./start.sh"
