@@ -75,23 +75,28 @@ def nodeUpgrade():
             network=[{'id': 'input', 'ip': '10.0.0.3/24'},
                 {'id': 'output', 'ip': '10.0.1.4/24'}])
     # create fw VNF with two interfaces. 'input' interface for 'client' and
-    # 'output' interface for the 'snort' VNF. Both interfaces are bridged to
+    # 'output' interface for the 'ids' VNF. Both interfaces are bridged to
     # ovs1 bridge. knodir/sonata-fw-vnf has OVS and Ryu controller.
     fw = dc.startCompute("fw", image='knodir/sonata-fw-vnf',
             network=[{'id': 'input', 'ip': '10.0.1.5/24'},
-                {'id': 'output-ids', 'ip': '10.0.1.60/24'},
-                {'id': 'output-vpn', 'ip': '10.0.1.61/24'}])
-    # create snort VNF with two interfaces. 'input' interface for 'fw' and
+                {'id': 'output-ids1', 'ip': '10.0.1.60/24'},
+                {'id': 'output-ids2', 'ip': '10.0.1.61/24'},
+                {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
+    # create ids VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
-    # snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
-    snort = dc.startCompute("snort", image='knodir/snort-trusty',
-            network=[{'id': 'input', 'ip': '10.0.1.7/24'},
-                {'id': 'output', 'ip': '10.0.1.8/24'}])
+    ids1 = dc.startCompute("ids1", image='knodir/snort-trusty',
+            network=[{'id': 'input', 'ip': '10.0.1.70/24'},
+                {'id': 'output', 'ip': '10.0.1.80/24'}])
+    ids2 = dc.startCompute("ids2", image='knodir/snort-xenial',
+            network=[{'id': 'input', 'ip': '10.0.1.71/24'},
+                {'id': 'output', 'ip': '10.0.1.81/24'}])
+ 
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     vpn = dc.startCompute("vpn", image='knodir/vpn-client',
-            network=[{'id': 'input-ids', 'ip': '10.0.1.90/24'},
-                {'id': 'input-fw', 'ip': '10.0.1.91/24'},
+            network=[{'id': 'input-ids1', 'ip': '10.0.1.90/24'},
+                {'id': 'input-ids2', 'ip': '10.0.1.91/24'},
+                {'id': 'input-fw', 'ip': '10.0.1.92/24'},
                 {'id': 'output', 'ip': '10.0.10.2/24'}])
     # create server VNF with one interface. Do not change assigned 10.0.10.10/24
     # address of the server. It is the address VPN clients use to connect to the
@@ -112,11 +117,15 @@ def nodeUpgrade():
     print('< wait complete')
     print('fw start done')
 
-    # execute /start.sh script inside snort image. It bridges input and output
-    # interfaces with br0, and starts snort process listering on br0.
-    cmd = 'sudo docker exec -i mn.snort /bin/bash -c "sh /start.sh"'
+    # execute /start.sh script inside ids image. It bridges input and output
+    # interfaces with br0, and starts ids process listering on br0.
+    cmd = 'sudo docker exec -i mn.ids1 /bin/bash -c "sh /start.sh"'
     execStatus = subprocess.call(cmd, shell=True)
-    print('returned %d from snort start.sh start (0 is success)' % execStatus)
+    print('returned %d from ids1 start.sh start (0 is success)' % execStatus)
+
+    cmd = 'sudo docker exec -i mn.ids2 /bin/bash -c "sh /start.sh"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from ids2 start.sh start (0 is success)' % execStatus)
 
     # execute /start.sh script inside nat image. It attaches both input
     # and output interfaces to OVS bridge to enable packet forwarding.
@@ -124,18 +133,22 @@ def nodeUpgrade():
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from nat start.sh start (0 is success)' % execStatus)
 
-    # chain 'client <-> nat <-> fw <-> snort <-> vpn <-> server'
+    # chain 'client <-> nat <-> fw <-> ids <-> vpn <-> server'
     net.setChain('client', 'nat', 'intf1', 'input', bidirectional=True,
                  cmd='add-flow')
     net.setChain('nat', 'fw', 'output', 'input', bidirectional=True,
                  cmd='add-flow')
 
-    net.setChain('fw', 'snort', 'output-ids', 'input', bidirectional=True,
+    net.setChain('fw', 'ids1', 'output-ids1', 'input', bidirectional=True,
+                 cmd='add-flow')
+    net.setChain('fw', 'ids2', 'output-ids2', 'input', bidirectional=True,
                  cmd='add-flow')
     net.setChain('fw', 'vpn', 'output-vpn', 'input-fw', bidirectional=True,
                  cmd='add-flow')
  
-    net.setChain('snort', 'vpn', 'output', 'input-ids', bidirectional=True,
+    net.setChain('ids1', 'vpn', 'output', 'input-ids1', bidirectional=True,
+                 cmd='add-flow')
+    net.setChain('ids2', 'vpn', 'output', 'input-ids2', bidirectional=True,
                  cmd='add-flow')
     net.setChain('vpn', 'server', 'output', 'intf2', bidirectional=True,
                  cmd='add-flow')
@@ -196,9 +209,13 @@ def nodeUpgrade():
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from route add to nat (0 is success)' % execStatus)
 
-    cmd = 'sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids"'
+    cmd = 'sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids1"'
     execStatus = subprocess.call(cmd, shell=True)
-    print('returned %d from route add to VPN (0 is success)' % execStatus)
+    print('returned %d from route add to VPN for ids1 (0 is success)' % execStatus)
+
+    cmd = 'sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids2"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from route add to VPN for ids2 (0 is success)' % execStatus)
 
     cmd = 'sudo docker exec -i mn.vpn /bin/bash -c "ip route del 10.0.10.10/32"'
     execStatus = subprocess.call(cmd, shell=True)
