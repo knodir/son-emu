@@ -17,7 +17,7 @@ OVS_DPID="0000000000000001"
 
 # declare an array variable holding the ovs port names
 # the interfaces are expected to be configured from the vnfd or nsd
-declare -a PORTS=("input" "output")
+declare -a PORTS=("input" "output-ids" "output-vpn")
 
 echo "setup ovs bridge"
 ovs-vsctl add-br $NAME
@@ -49,5 +49,11 @@ echo "setup generic forwarding for PCAP traffic"
 ovs-ofctl add-flow ovs1 'priority=2,in_port=1,action=output:2'
 sleep 1
 ovs-ofctl add-flow ovs1 'priority=2,in_port=2,action=output:1'
+sleep 1
 
-
+# send ftp traffic (port 20, 21) over port #3 (output-vpn, directly to VPN)
+ovs-ofctl add-flow ovs1 'priority=3,in_port=1,tcp,tp_src=20,actions=output:3'
+ovs-ofctl add-flow ovs1 'priority=3,in_port=3,tcp,tp_src=20,actions=output:1'
+ovs-ofctl add-flow ovs1 'priority=3,in_port=1,tcp,tp_src=21,actions=output:3'
+ovs-ofctl add-flow ovs1 'priority=3,in_port=3,tcp,tp_src=21,actions=output:1'
+sleep 1

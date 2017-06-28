@@ -518,7 +518,8 @@ def nodeUpgrade():
     # ovs1 bridge. knodir/sonata-fw-vnf has OVS and Ryu controller.
     fw = dc.startCompute("fw", image='knodir/sonata-fw-vnf',
             network=[{'id': 'input', 'ip': '10.0.1.5/24'},
-                {'id': 'output', 'ip': '10.0.1.6/24'}])
+                {'id': 'output-ids', 'ip': '10.0.1.60/24'},
+                {'id': 'output-vpn', 'ip': '10.0.1.61/24'}])
     # create snort VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
     # snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
@@ -528,7 +529,8 @@ def nodeUpgrade():
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     vpn = dc.startCompute("vpn", image='knodir/vpn-client',
-            network=[{'id': 'input', 'ip': '10.0.1.9/24'},
+            network=[{'id': 'input-ids', 'ip': '10.0.1.90/24'},
+                {'id': 'input-fw', 'ip': '10.0.1.91/24'},
                 {'id': 'output', 'ip': '10.0.10.2/24'}])
     # create server VNF with one interface. Do not change assigned 10.0.10.10/24
     # address of the server. It is the address VPN clients use to connect to the
@@ -568,9 +570,13 @@ def nodeUpgrade():
                  cmd='add-flow')
     net.setChain('nat', 'fw', 'output', 'input', bidirectional=True,
                  cmd='add-flow')
-    net.setChain('fw', 'snort', 'output', 'input', bidirectional=True,
+
+    net.setChain('fw', 'snort', 'output-ids', 'input', bidirectional=True,
                  cmd='add-flow')
-    net.setChain('snort', 'vpn', 'output', 'input', bidirectional=True,
+    net.setChain('fw', 'vpn', 'output-vpn', 'input-fw', bidirectional=True,
+                 cmd='add-flow')
+ 
+    net.setChain('snort', 'vpn', 'output', 'input-ids', bidirectional=True,
                  cmd='add-flow')
     net.setChain('vpn', 'server', 'output', 'intf2', bidirectional=True,
                  cmd='add-flow')
@@ -652,6 +658,7 @@ def nodeUpgrade():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
+    # logging.basicConfig(level=logging.INFO)
 
     # basicTest()
     # runDummyForwarderOnly()

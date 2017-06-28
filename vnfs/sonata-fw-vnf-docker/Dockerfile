@@ -11,9 +11,6 @@ RUN	apt-get update && apt-get install -y \
   tcpdump \
   iperf3
 
-# EXPOSE 5201
-# EXPOSE 15201
-
 # install OpenvSwitch 
 RUN apt-get install -y openvswitch-switch openvswitch-common
 
