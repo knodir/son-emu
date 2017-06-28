@@ -14,6 +14,38 @@ from mininet.cli import CLI
 from mininet.link import TCLink, Link
 
 
+# def prepareDC():
+#     """ Prepares physical topology to place chains. """
+#     net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
+#     # add 3 data centers
+#     client_dc = net.addDatacenter('client-dc')
+#     chain_dc = net.addDatacenter('chain-dc')
+#     server_dc = net.addDatacenter('server-dc')
+# 
+#     # connect data centers with switches
+#     s1 = net.addSwitch('s1')
+#     s2 = net.addSwitch('s2')
+# 
+#     # link data centers and switches
+#     net.addLink(client_dc, s1)
+#     net.addLink(s1, chain_dc)
+#     net.addLink(chain_dc, s2)
+#     net.addLink(s2, server_dc)
+# 
+#     # create REST API endpoint
+#     api = RestApiEndpoint("0.0.0.0", 5001)
+# 
+#     # connect API endpoint to containernet
+#     api.connectDCNetwork(net)
+# 
+#     # connect data centers to the endpoint
+#     api.connectDatacenter(client_dc)
+#     api.connectDatacenter(chain_dc)
+#     api.connectDatacenter(server_dc)
+# 
+#     return (api, net, [client_dc, chain_dc, server_dc])
+
+
 def nodeUpgrade():
     """ Implements node-upgrade scenario. TBD. """
 
@@ -33,7 +65,7 @@ def nodeUpgrade():
     # start API and containernet
     api.start()
     net.start()
-
+ 
     # create client with one interface
     client = dc.startCompute("client", image='knodir/client',
             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
@@ -69,8 +101,6 @@ def nodeUpgrade():
     # client.ovpn file as well as subprocess mn.vpn route injection call below.
     server = dc.startCompute("server", image='knodir/vpn-server',
             network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
-    print('ping client -> server before explicit chaining. Packet drop %s%%' %
-          net.ping([client, server]))
 
     # execute /start.sh script inside firewall Docker image. It starts Ryu
     # controller and OVS with proper configuration.
@@ -166,7 +196,7 @@ def nodeUpgrade():
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from route add to nat (0 is success)' % execStatus)
 
-    cmd = 'sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input"'
+    cmd = 'sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids"'
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from route add to VPN (0 is success)' % execStatus)
 
