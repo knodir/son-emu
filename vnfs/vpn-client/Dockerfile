@@ -11,19 +11,24 @@ RUN	apt-get update && apt-get install -y \
   vim \
   tcpdump \
   openvpn \
-  software-properties-common
+  dstat
 
 # move tcpdump from sbin to slience apparmor
 RUN mv /usr/sbin/tcpdump /usr/local/bin/
 
 # install iperf3
-RUN add-apt-repository -y "ppa:patrickdk/general-lucid" 
-RUN apt-get update
-RUN apt-get install -y iperf3
+ADD libiperf0_3.1.3-1_amd64.deb libiperf0_3.1.3-1_amd64.deb
+ADD iperf3_3.1.3-1_amd64.deb iperf3_3.1.3-1_amd64.deb
+
+RUN dpkg -i libiperf0_3.1.3-1_amd64.deb iperf3_3.1.3-1_amd64.deb
+RUN rm libiperf0_3.1.3-1_amd64.deb iperf3_3.1.3-1_amd64.deb
 
 ADD start.sh start.sh
 RUN chmod +x start.sh
 ADD client.ovpn client.ovpn
+
+# replace old dstat with the latest
+ADD dstat /usr/bin/dstat
 
 # set entry point for emulator gatekeeper
 ENV SON_EMU_CMD "./start.sh"
