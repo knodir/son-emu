@@ -1,5 +1,5 @@
 scenarios/upgrade/output
-
+*.DS_Store
 
 # emulation project built files
 vnfs/*.son
