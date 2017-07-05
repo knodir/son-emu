@@ -20,7 +20,7 @@ def extract_iperf(fname):
     return bw
 
 
-def extract_dstat(fname):
+def extract_dstat(fname, pos):
     """ Extracts and returns bandwidth value from CSV file. """
     bw = []
     # open the csv file with Python CSV parser, walk through each line (row) and
@@ -29,7 +29,12 @@ def extract_dstat(fname):
     with open(fname) as data_file:
         reader = csv.DictReader(data_file)
         for row in reader:
-            val = row['Dstat 0.7.3 CSV output']
+            #print(row)
+            if pos == 1:
+                val = row['Dstat 0.7.3 CSV output']
+            else:
+                val = row[None][0]
+            # print(val)
             if val.isdigit():
                 # multiply to 8 to convert byte to bit (dstat reports on bytes)
                 mbps = 8 * int(val) / 1048576 # = (1024 * 1024)
@@ -50,9 +55,9 @@ def plot(x, client_bw, ids1_bw, ids2_bw, vpn_bw, fname):
     plt.xlabel('Time (s)')
     plt.ylabel('Bandwidth (Mbps)')
     client = plt.plot(x, client_bw, 'r--', label='Client')
-    ids1 = plt.plot(x, ids1_bw, 'g.', label='IDS1')
-    ids2 = plt.plot(x, ids2_bw, 'bo', label='IDS2')
-    vpn = plt.plot(x, vpn_bw, 'k^', label='VPN')
+    ids1 = plt.plot(x, ids1_bw, 'g--', label='IDS1')
+    ids2 = plt.plot(x, ids2_bw, 'b--', label='IDS2')
+    vpn = plt.plot(x, vpn_bw, 'k--', label='VPN')
     ax.legend(loc='upper left', bbox_to_anchor=(0, 1.2), numpoints=1, ncol=4,
             frameon=False)
     plt.draw()
@@ -63,16 +68,20 @@ def plot(x, client_bw, ids1_bw, ids2_bw, vpn_bw, fname):
 
 
 if __name__ == '__main__':
-    client_bw = extract_iperf('./results/from-client.json')
+    # for client we monitor TX traffic, which is the value on the 2nd position
+    # of the CSV file.
+    client_bw = extract_dstat('./results/from-client.csv', 2)
     print('client_bw = %s, len = %d' % (client_bw, len(client_bw)))
 
-    ids1_bw = extract_dstat('./results/from-ids1.csv')
+    # for all other VNFs we monitor RX traffic, which is the value on the 1st
+    # position of the CSV file.
+    ids1_bw = extract_dstat('./results/from-ids1.csv', 1)
     print('ids1_bw = %s, len = %d' % (ids1_bw, len(ids1_bw)))
 
-    ids2_bw = extract_dstat('./results/from-ids2.csv')
+    ids2_bw = extract_dstat('./results/from-ids2.csv', 1)
     print('ids2_bw = %s, len = %d' % (ids2_bw, len(ids2_bw)))
 
-    vpn_bw = extract_dstat('./results/from-vpn.csv')
+    vpn_bw = extract_dstat('./results/from-vpn.csv', 1)
     print('vpn_bw = %s, len = %d' % (vpn_bw, len(vpn_bw)))
 
     figure_name = 'results/upgrade.png'
