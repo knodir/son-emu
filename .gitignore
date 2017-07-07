@@ -83,3 +83,7 @@ target/
 utils/ci/junit-xml/*.xml
 
 *.pcap
+
+*.sublime-workspace
+
+*.sublime-project
