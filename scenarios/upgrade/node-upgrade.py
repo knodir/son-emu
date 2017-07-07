@@ -4,6 +4,9 @@ import logging
 
 from emuvim.dcemulator.net import DCNetwork
 from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
+from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM
+from emuvim.dcemulator.resourcemodel import ResourceModelRegistrar
+
 
 from mininet.log import setLogLevel, info
 from mininet.node import RemoteController
@@ -17,38 +20,58 @@ from mininet.link import TCLink, Link
 def prepareDC():
     """ Prepares physical topology to place chains. """
 
-    # net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
-    # # add one data center
-    # dc = net.addDatacenter('dc1', metadata={'node-upgrade'})
+    # We use Sonata data center construct to simulate physical servers (just
+    # servers hereafter). The reason is that Sonata DC has CPU/RAM resource
+    # constraints just like the servers. We also model the links between servers
+    # with bandwidth constraints of Sonata switch-to-DC link.
 
-    # # create REST API endpoint
-    # api = RestApiEndpoint("0.0.0.0", 5001)
+    # The topology we create below is one rack with two servers. The rack has
+    # ToR switches (Sonata switch called "tor1"), to place chain VNFs.
 
-    # # connect API endpoint to containernet
-    # api.connectDCNetwork(net)
+    # Similar to the paper story of middlebox-as-a-server, we will put client
+    # and server (traffic source and sink) outside the DC.
 
-    # # connect data centers to the endpoint
-    # api.connectDatacenter(dc)
+    # Here is the reason why we do not use Sonata "host" to model the servers.
+    # Sonata uses Mininet host construct as-is. Mininet "host" supports only CPU
+    # resource constraint. Therefore, we do not use Sonata "host" construct.
 
-    # # start API and containernet
-    # api.start()
-    # net.start()
+    # Unless otherwise specified, we always use "server" for variables and
+    # description instead of "DC". This should avoid confusion with terminology.
 
+    net = DCNetwork(controller=RemoteController, monitor=True,
+            enable_learning=True)
+    # add 3 servers
+    off_cloud = net.addDatacenter('off-cloud') # place client/server VNFs
+    chain_server1 = net.addDatacenter('chain-server1')
+    chain_server2 = net.addDatacenter('chain-server2')
 
-    net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
-    # add 3 data centers
-    client_dc = net.addDatacenter('client-dc')
-    chain_dc = net.addDatacenter('chain-dc')
-    server_dc = net.addDatacenter('server-dc')
+    # add resource model (rm) to limit cpu/ram available in each server. We
+    # create one resource mode and use it for all servers, meaning all of our
+    # servers are homogeneous. Create multiple RMs for heterogeneous servers
+    # (with different amount of cpu,ram).
+    # config
+    E_CPU = 3.0 # number of actual cores (effective cpu?)
+    MAX_CU = 30 # compute units
+    E_MEM = 8192
+    MAX_MU = 256
+
+    reg = ResourceModelRegistrar(dc_emulation_max_cpu=E_CPU,
+            dc_emulation_max_mem=E_MEM)
+
+    rm = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    reg.register("homogeneous_rm", rm)
+
+    off_cloud.assignResourceModel(rm)
+    chain_server1.assignResourceModel(rm)
+    chain_server2.assignResourceModel(rm)
 
     # connect data centers with switches
-    s1 = net.addSwitch('s1')
-    # s2 = net.addSwitch('s2')
+    tor1 = net.addSwitch('tor1')
 
     # link data centers and switches
-    net.addLink(client_dc, s1)
-    net.addLink(chain_dc, s1)
-    net.addLink(server_dc, s1)
+    net.addLink(off_cloud, tor1)
+    net.addLink(chain_server1, tor1)
+    net.addLink(chain_server2, tor1)
 
     # create REST API endpoint
     api = RestApiEndpoint("0.0.0.0", 5001)
@@ -57,15 +80,15 @@ def prepareDC():
     api.connectDCNetwork(net)
 
     # connect data centers to the endpoint
-    api.connectDatacenter(client_dc)
-    api.connectDatacenter(chain_dc)
-    api.connectDatacenter(server_dc)
+    api.connectDatacenter(off_cloud)
+    api.connectDatacenter(chain_server1)
+    api.connectDatacenter(chain_server2)
 
     # start API and containernet
     api.start()
     net.start()
 
-    return (net, api, [client_dc, chain_dc, server_dc])
+    return (net, api, [off_cloud, chain_server1, chain_server2])
     # return (net, dc, api)
 
 
@@ -74,36 +97,42 @@ def nodeUpgrade():
 
     cmds = []
     net, api, dcs = prepareDC()
-    client_dc, chain_dc, server_dc = dcs[0], dcs[1], dcs[2]
+    off_cloud, cs1, cs2 = dcs[0], dcs[1], dcs[2]
 
     # create client with one interface
-    client = client_dc.startCompute("client", image='knodir/client',
+    client = off_cloud.startCompute("client", image='knodir/client',
+            flavor_name="tiny",
             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
     # create NAT VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
-    nat = chain_dc.startCompute("nat", image='knodir/nat',
+    nat = cs1.startCompute("nat", image='knodir/nat',
+            flavor_name="tiny",
             network=[{'id': 'input', 'ip': '10.0.0.3/24'},
                 {'id': 'output', 'ip': '10.0.1.4/24'}])
     # create fw VNF with two interfaces. 'input' interface for 'client' and
     # 'output' interface for the 'ids' VNF. Both interfaces are bridged to
     # ovs1 bridge. knodir/sonata-fw-vnf has OVS and Ryu controller.
-    fw = chain_dc.startCompute("fw", image='knodir/sonata-fw-vnf',
+    fw = cs1.startCompute("fw", image='knodir/sonata-fw-vnf',
+            flavor_name="xlarge",
             network=[{'id': 'input', 'ip': '10.0.1.5/24'},
                 {'id': 'output-ids1', 'ip': '10.0.1.60/24'},
                 {'id': 'output-ids2', 'ip': '10.0.1.61/24'},
                 {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
     # create ids VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
-    ids1 = chain_dc.startCompute("ids1", image='knodir/snort-trusty',
+    ids1 = cs1.startCompute("ids1", image='knodir/snort-trusty',
+            flavor_name="tiny",
             network=[{'id': 'input', 'ip': '10.0.1.70/24'},
                 {'id': 'output', 'ip': '10.0.1.80/24'}])
-    ids2 = chain_dc.startCompute("ids2", image='knodir/snort-xenial',
+    ids2 = cs1.startCompute("ids2", image='knodir/snort-xenial',
+            flavor_name="tiny",
             network=[{'id': 'input', 'ip': '10.0.1.71/24'},
                 {'id': 'output', 'ip': '10.0.1.81/24'}])
  
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
-    vpn = chain_dc.startCompute("vpn", image='knodir/vpn-client',
+    vpn = cs1.startCompute("vpn", image='knodir/vpn-client',
+            flavor_name="tiny",
             network=[{'id': 'input-ids1', 'ip': '10.0.1.90/24'},
                 {'id': 'input-ids2', 'ip': '10.0.1.91/24'},
                 {'id': 'input-fw', 'ip': '10.0.1.92/24'},
@@ -114,7 +143,8 @@ def nodeUpgrade():
     # Docker image. We also remove the injected routing table entry for this
     # address. So, if you change this address make sure it is changed inside
     # client.ovpn file as well as subprocess mn.vpn route injection call below.
-    server = server_dc.startCompute("server", image='knodir/vpn-server',
+    server = off_cloud.startCompute("server", image='knodir/vpn-server',
+            flavor_name="tiny",
             network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
 
     # execute /start.sh script inside firewall Docker image. It starts Ryu
