@@ -38,28 +38,43 @@ def prepareDC():
     # Unless otherwise specified, we always use "server" for variables and
     # description instead of "DC". This should avoid confusion with terminology.
 
+    # add resource model (rm) to limit cpu/ram available in each server. We
+    # create one resource mode and use it for all servers, meaning all of our
+    # servers are homogeneous. Create multiple RMs for heterogeneous servers
+    # (with different amount of cpu,ram).
+    MAX_CU = 128 # max compute units
+    MAX_MU = 8192 # max memory units
+
+    # the cpu, ram resource above are consumed by VNFs with one of these
+    # flavors. For some reason memory allocated for tiny flavor is 42 MB,
+    # instead of 32 MB in this systems. Other flavors are multipliers of this
+    # 42 MB (as expected).
+    # "tiny",  {"compute": 0.5, "memory": 32, "disk": 1}
+    # "small",  {"compute": 1.0, "memory": 128, "disk": 20}
+    # "medium",  {"compute": 4.0, "memory": 256, "disk": 40}
+    # "large",  {"compute": 8.0, "memory": 512, "disk": 80}
+    # "xlarge",  {"compute": 16.0, "memory": 1024, "disk": 160}
+    #
+    # Note that all these container VNFs need at least 500 MB of memory to be
+    # able to work. Firewall in particular, runs OVS, needs more than 1 GB to be
+    # able to process packets. If you do not allocate sufficient CPU, system
+    # behaves bad. In most cases all physical cores gets pinned (probably
+    # because of the contention between OVS and cgroup mem limitation) and
+    # Sonata VM OOM killer starts killing random processes.
+
     net = DCNetwork(controller=RemoteController, monitor=True,
+            dc_emulation_max_cpu=MAX_CU, dc_emulation_max_mem=MAX_MU,
             enable_learning=True)
+
+    reg = ResourceModelRegistrar(MAX_CU, MAX_MU)
+    rm = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    reg.register("homogeneous_rm", rm)
+
     # add 3 servers
     off_cloud = net.addDatacenter('off-cloud') # place client/server VNFs
     chain_server1 = net.addDatacenter('chain-server1')
     chain_server2 = net.addDatacenter('chain-server2')
 
-    # add resource model (rm) to limit cpu/ram available in each server. We
-    # create one resource mode and use it for all servers, meaning all of our
-    # servers are homogeneous. Create multiple RMs for heterogeneous servers
-    # (with different amount of cpu,ram).
-    # config
-    E_CPU = 3.0 # number of actual cores (effective cpu?)
-    MAX_CU = 30 # compute units
-    E_MEM = 8192
-    MAX_MU = 256
-
-    reg = ResourceModelRegistrar(dc_emulation_max_cpu=E_CPU,
-            dc_emulation_max_mem=E_MEM)
-
-    rm = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
-    reg.register("homogeneous_rm", rm)
 
     off_cloud.assignResourceModel(rm)
     chain_server1.assignResourceModel(rm)
@@ -98,15 +113,16 @@ def nodeUpgrade():
     cmds = []
     net, api, dcs = prepareDC()
     off_cloud, cs1, cs2 = dcs[0], dcs[1], dcs[2]
+    fl = "large"
 
     # create client with one interface
     client = off_cloud.startCompute("client", image='knodir/client',
-            flavor_name="tiny",
+            flavor_name=fl,
             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
     # create NAT VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     nat = cs1.startCompute("nat", image='knodir/nat',
-            flavor_name="tiny",
+            flavor_name=fl,
             network=[{'id': 'input', 'ip': '10.0.0.3/24'},
                 {'id': 'output', 'ip': '10.0.1.4/24'}])
     # create fw VNF with two interfaces. 'input' interface for 'client' and
@@ -121,18 +137,18 @@ def nodeUpgrade():
     # create ids VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
     ids1 = cs1.startCompute("ids1", image='knodir/snort-trusty',
-            flavor_name="tiny",
+            flavor_name=fl,
             network=[{'id': 'input', 'ip': '10.0.1.70/24'},
                 {'id': 'output', 'ip': '10.0.1.80/24'}])
     ids2 = cs1.startCompute("ids2", image='knodir/snort-xenial',
-            flavor_name="tiny",
+            flavor_name=fl,
             network=[{'id': 'input', 'ip': '10.0.1.71/24'},
                 {'id': 'output', 'ip': '10.0.1.81/24'}])
  
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     vpn = cs1.startCompute("vpn", image='knodir/vpn-client',
-            flavor_name="tiny",
+            flavor_name=fl,
             network=[{'id': 'input-ids1', 'ip': '10.0.1.90/24'},
                 {'id': 'input-ids2', 'ip': '10.0.1.91/24'},
                 {'id': 'input-fw', 'ip': '10.0.1.92/24'},
@@ -144,8 +160,11 @@ def nodeUpgrade():
     # address. So, if you change this address make sure it is changed inside
     # client.ovpn file as well as subprocess mn.vpn route injection call below.
     server = off_cloud.startCompute("server", image='knodir/vpn-server',
-            flavor_name="tiny",
+            flavor_name="small",
             network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
+
+    #net.stop()
+    #return
 
     # execute /start.sh script inside firewall Docker image. It starts Ryu
     # controller and OVS with proper configuration.
