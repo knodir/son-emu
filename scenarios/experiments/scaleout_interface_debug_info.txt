@@ -1,0 +1,214 @@
+dc1.s1-eth1 Link encap:Ethernet  HWaddr fa:5a:3b:b7:7e:e7  
+          inet6 addr: fe80::f85a:3bff:feb7:7ee7/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:1934134 errors:0 dropped:15584 overruns:0 frame:0
+          TX packets:33 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:135391108 (135.3 MB)  TX bytes:2930 (2.9 KB)
+
+dc1.s1-eth2 Link encap:Ethernet  HWaddr 3a:fe:e4:c5:99:12  
+          inet6 addr: fe80::38fe:e4ff:fec5:9912/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:25 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:1016336 errors:0 dropped:348113 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:2282 (2.2 KB)  TX bytes:71143980 (71.1 MB)
+
+dc2.s1-eth1 Link encap:Ethernet  HWaddr 1a:44:bc:ce:53:c3  
+          inet6 addr: fe80::1844:bcff:fece:53c3/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:183 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:2310574 errors:0 dropped:886783 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:18767 (18.7 KB)  TX bytes:161744861 (161.7 MB)
+
+dc2.s1-eth2 Link encap:Ethernet  HWaddr 8a:27:a3:f0:79:f5  
+          inet6 addr: fe80::8827:a3ff:fef0:79f5/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:15 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:2210706 errors:0 dropped:799636 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:1302 (1.3 KB)  TX bytes:154750120 (154.7 MB)
+
+dc2.s1-eth3 Link encap:Ethernet  HWaddr f2:e3:a6:ed:80:6c  
+          inet6 addr: fe80::f0e3:a6ff:feed:806c/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:26 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:2258744 errors:0 dropped:866997 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:2324 (2.3 KB)  TX bytes:158112472 (158.1 MB)
+
+dc2.s1-eth4 Link encap:Ethernet  HWaddr ca:c8:a8:92:15:7b  
+          inet6 addr: fe80::c8c8:a8ff:fe92:157b/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:17 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:2271790 errors:0 dropped:885845 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:1414 (1.4 KB)  TX bytes:159025912 (159.0 MB)
+
+dc2.s1-eth5 Link encap:Ethernet  HWaddr 9a:59:c8:87:33:84  
+          inet6 addr: fe80::9859:c8ff:fe87:3384/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:2264004 errors:0 dropped:15554 overruns:0 frame:0
+          TX packets:391715 errors:0 dropped:520596 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:158480784 (158.4 MB)  TX bytes:27420382 (27.4 MB)
+
+dc2.s1-eth6 Link encap:Ethernet  HWaddr 22:ea:6c:5a:d3:cd  
+          inet6 addr: fe80::20ea:6cff:fe5a:d3cd/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:2310231 errors:0 dropped:886978 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 B)  TX bytes:161716278 (161.7 MB)
+
+dc2.s1-eth7 Link encap:Ethernet  HWaddr 1a:39:0f:1f:20:dd  
+          inet6 addr: fe80::1839:fff:fe1f:20dd/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:465651 errors:0 dropped:10704 overruns:0 frame:0
+          TX packets:2104885 errors:0 dropped:626711 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:32595794 (32.5 MB)  TX bytes:147342542 (147.3 MB)
+
+dc2.s1-eth8 Link encap:Ethernet  HWaddr 92:b8:cc:23:a6:da  
+          inet6 addr: fe80::90b8:ccff:fe23:a6da/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:467917 errors:0 dropped:10656 overruns:0 frame:0
+          TX packets:2102643 errors:0 dropped:626690 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:32754694 (32.7 MB)  TX bytes:147185322 (147.1 MB)
+
+dc2.s1-eth9 Link encap:Ethernet  HWaddr 1e:4f:c7:ba:b9:e5  
+          inet6 addr: fe80::1c4f:c7ff:feba:b9e5/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:16 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:2309399 errors:0 dropped:887835 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:1344 (1.3 KB)  TX bytes:161658522 (161.6 MB)
+
+dc2.s1-eth10 Link encap:Ethernet  HWaddr 12:ff:71:51:4a:e9  
+          inet6 addr: fe80::10ff:71ff:fe51:4ae9/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:2309286 errors:0 dropped:887922 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 B)  TX bytes:161650108 (161.6 MB)
+
+dc2.s1-eth11 Link encap:Ethernet  HWaddr 12:33:1e:e7:cd:fa  
+          inet6 addr: fe80::1033:1eff:fee7:cdfa/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:140 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:2309339 errors:0 dropped:888006 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:14141 (14.1 KB)  TX bytes:161658963 (161.6 MB)
+
+dc3.s1-eth1 Link encap:Ethernet  HWaddr 92:a0:c1:a2:d6:33  
+          inet6 addr: fe80::90a0:c1ff:fea2:d633/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:1934260 errors:0 dropped:15584 overruns:0 frame:0
+          TX packets:145 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:135404037 (135.4 MB)  TX bytes:15383 (15.3 KB)
+
+dc3.s1-eth2 Link encap:Ethernet  HWaddr 3a:f9:94:69:f0:25  
+          inet6 addr: fe80::38f9:94ff:fe69:f025/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:137 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:1066794 errors:0 dropped:365285 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:14735 (14.7 KB)  TX bytes:74680141 (74.6 MB)
+
+docker0   Link encap:Ethernet  HWaddr 02:42:7b:dd:43:0b  
+          inet addr:172.17.0.1  Bcast:0.0.0.0  Mask:255.255.0.0
+          inet6 addr: fe80::42:7bff:fedd:430b/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:81 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:74 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:4903 (4.9 KB)  TX bytes:8469 (8.4 KB)
+
+enp0s3    Link encap:Ethernet  HWaddr 02:ef:c4:99:42:42  
+          inet addr:10.0.2.15  Bcast:10.0.2.255  Mask:255.255.255.0
+          inet6 addr: fe80::ef:c4ff:fe99:4242/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:16348 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:13361 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:2454253 (2.4 MB)  TX bytes:1754067 (1.7 MB)
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+          RX packets:16728 errors:0 dropped:774 overruns:0 frame:0
+          TX packets:16728 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1 
+          RX bytes:1034449 (1.0 MB)  TX bytes:1034449 (1.0 MB)
+
+s1-eth1   Link encap:Ethernet  HWaddr b6:3b:82:7b:cc:e2  
+          inet6 addr: fe80::b43b:82ff:fe7b:cce2/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:33 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:1934134 errors:0 dropped:7792 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:2930 (2.9 KB)  TX bytes:135391108 (135.3 MB)
+
+s1-eth2   Link encap:Ethernet  HWaddr 2a:2f:cf:bb:43:df  
+          inet6 addr: fe80::282f:cfff:febb:43df/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:2310574 errors:0 dropped:1773566 overruns:0 frame:0
+          TX packets:183 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:161744861 (161.7 MB)  TX bytes:18767 (18.7 KB)
+
+s1-eth3   Link encap:Ethernet  HWaddr 8e:70:3f:4f:72:8e  
+          inet6 addr: fe80::8c70:3fff:fe4f:728e/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:145 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:1934260 errors:0 dropped:7792 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:15383 (15.3 KB)  TX bytes:135404037 (135.4 MB)
+
+Simple Ping Request:
+
+[Interface:dc1.s1-eth2] 20:20:19.919195 IP 10.0.0.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 CLIENT
+[Interface:dc1.s1-eth1] 20:20:19.919387 IP 10.0.0.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 LEAVING DC1?
+[Interface:s1-eth1]     20:20:19.919394 IP 10.0.0.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 SWITCH
+[Interface:dc2.s1-eth1] 20:20:19.919518 IP 10.0.0.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 ENTERING DC2?
+[Interface:dc2.s1-eth2] 20:20:19.919602 IP 10.0.0.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 NAT-IN
+[Interface:dc2.s1-eth3] 20:20:19.919644 IP 10.0.1.4 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 NAT-OUT
+[Interface:dc2.s1-eth4] 20:20:19.919731 IP 10.0.1.4 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 FW-IN
+[Interface:dc2.s1-eth5] 20:20:19.919936 IP 10.0.1.4 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 FW-OUT
+[Interface:dc2.s1-eth7] 20:20:19.920032 IP 10.0.1.4 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 IDS-IN
+[Interface:dc2.s1-eth8] 20:20:19.920073 IP 10.0.1.4 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 IDS-OUT
+[Interface:dc2.s1-eth9] 20:20:19.920170 IP 10.0.1.4 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 VPN-IN
+[Interface:dc2.s1-eth11]20:20:19.920207 IP 10.0.10.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 VPN-OUT
+[Interface:dc2.s1-eth1] 20:20:19.920213 IP 10.0.10.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 LEAVING DC2?
+[Interface:s1-eth2]     20:20:19.920216 IP 10.0.10.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 SWITCH
+[Interface:s1-eth3]     20:20:19.920221 IP 10.0.10.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 SWITCH
+[Interface:dc3.s1-eth1] 20:20:19.920225 IP 10.0.10.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 ENTERING DC1?
+[Interface:dc3.s1-eth2] 20:20:19.920235 IP 10.0.10.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 SERVER
+
+Interface s1-eth6 and s1-eth10 are missing as they are part of the firewall-to-vpn shortcut.
+
+Simple Ping Reply:
+[Interface:dc3.s1-eth2] 20:20:19.920274 IP 10.0.10.10 > 10.0.10.2: ICMP echo reply, id 89, seq 0, length 64
+[Interface:dc3.s1-eth1] 20:20:19.920282 IP 10.0.10.10 > 10.0.10.2: ICMP echo reply, id 89, seq 0, length 64
+[Interface:s1-eth3]     20:20:19.920284 IP 10.0.10.10 > 10.0.10.2: ICMP echo reply, id 89, seq 0, length 64
+[Interface:s1-eth2]     20:20:19.920287 IP 10.0.10.10 > 10.0.10.2: ICMP echo reply, id 89, seq 0, length 64
+[Interface:dc2.s1-eth1] 20:20:19.920288 IP 10.0.10.10 > 10.0.10.2: ICMP echo reply, id 89, seq 0, length 64
+[Interface:dc2.s1-eth11]20:20:19.920292 IP 10.0.10.10 > 10.0.10.2: ICMP echo reply, id 89, seq 0, length 64
+[Interface:dc2.s1-eth9] 20:20:19.920302 IP 10.0.10.10 > 10.0.1.4: ICMP echo reply, id 89, seq 0, length 64
+[Interface:dc2.s1-eth8] 20:20:19.920392 IP 10.0.10.10 > 10.0.1.4: ICMP echo reply, id 89, seq 0, length 64
+[Interface:dc2.s1-eth7] 20:20:19.920413 IP 10.0.10.10 > 10.0.1.4: ICMP echo reply, id 89, seq 0, length 64
+[Interface:dc2.s1-eth5] 20:20:19.920492 IP 10.0.10.10 > 10.0.1.4: ICMP echo reply, id 89, seq 0, length 64
+[Interface:dc2.s1-eth4] 20:20:19.920656 IP 10.0.10.10 > 10.0.1.4: ICMP echo reply, id 89, seq 0, length 64
+[Interface:dc2.s1-eth3] 20:20:19.920750 IP 10.0.10.10 > 10.0.1.4: ICMP echo reply, id 89, seq 0, length 64
+[Interface:dc2.s1-eth2] 20:20:19.920772 IP 10.0.10.10 > 10.0.0.2: ICMP echo reply, id 89, seq 0, length 64
+[Interface:dc2.s1-eth1] 20:20:19.920925 IP 10.0.10.10 > 10.0.0.2: ICMP echo reply, id 89, seq 0, length 64
+[Interface:s1-eth2]     20:20:19.920931 IP 10.0.10.10 > 10.0.0.2: ICMP echo reply, id 89, seq 0, length 64
+[Interface:dc1.s1-eth1] 20:20:19.921087 IP 10.0.10.10 > 10.0.0.2: ICMP echo reply, id 89, seq 0, length 64
+[Interface:dc1.s1-eth2] 20:20:19.921216 IP 10.0.10.10 > 10.0.0.2: ICMP echo reply, id 89, seq 0, length 64
+
+
+

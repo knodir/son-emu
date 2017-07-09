@@ -87,3 +87,5 @@ utils/ci/junit-xml/*.xml
 *.sublime-workspace
 
 *.sublime-project
+
+*.dmp
