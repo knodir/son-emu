@@ -186,7 +186,7 @@ Simple Ping Request:
 [Interface:dc2.s1-eth1] 20:20:19.920213 IP 10.0.10.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 LEAVING DC2?
 [Interface:s1-eth2]     20:20:19.920216 IP 10.0.10.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 SWITCH
 [Interface:s1-eth3]     20:20:19.920221 IP 10.0.10.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 SWITCH
-[Interface:dc3.s1-eth1] 20:20:19.920225 IP 10.0.10.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 ENTERING DC1?
+[Interface:dc3.s1-eth1] 20:20:19.920225 IP 10.0.10.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 ENTERING DC3?
 [Interface:dc3.s1-eth2] 20:20:19.920235 IP 10.0.10.2 > 10.0.10.10: ICMP echo request, id 89, seq 0, length 64 SERVER
 
 Interface s1-eth6 and s1-eth10 are missing as they are part of the firewall-to-vpn shortcut.
