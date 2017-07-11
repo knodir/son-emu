@@ -270,7 +270,7 @@ class RunBench(cmd.Cmd):
         return True
 
     def do_help(self, line):
-        commands = ['help', 'start', 'switch', 'restore', 'q | quit']
+        commands = ['help', 'upgrade', 'switch', 'restore', 'scaleout', 'q | quit']
         print("list of supported commands: %s" % commands)
 
     def default(self, line):
