@@ -5,10 +5,10 @@ Generates FTP data packets (port 20) with given data length (in each packet) and
 number of packets. Writes the result to ftp.pcap file.
 """
 
-from scapy.all import IP,TCP,send,wrpcap
+from scapy.all import Ether,IP,TCP,send,wrpcap
 
 data_length = 1400
-num_of_packets = 1000
+num_of_packets = 9999
 pcap_fname = 'ftp.pcap'
 
 # generate raw content to put as a packet payload
@@ -17,8 +17,8 @@ for ii in range(data_length):
     raw_data += "A"
 
 # generate single packet
-pkt = IP(src="198.162.52.143", dst="198.162.52.147")/TCP(sport=20,
-        dport=20)/raw_data
+pkt = Ether(src="00:00:00:00:00:01", dst="00:00:00:00:00:02")/IP(
+        src="10.0.0.2", dst="10.8.0.1")/TCP(sport=20, dport=20)/raw_data
 
 # print packet summary for debugging purposes
 print(pkt.summary())
