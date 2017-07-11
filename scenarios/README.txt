@@ -1,3 +1,25 @@
+Follow these steps to install on a new Linux 16.04 LTS machine
+
+mkdir -p workspace/dev
+cd workspace/dev/
+sudo apt-get install ansible git aptitude
+sudo vim /etc/ansible/hosts
+Add: localhost ansible_connection=local
+
+git clone https://github.com/containernet/containernet.git
+cd containernet/ansible/
+sudo ansible-playbook install.yml
+
+cd ~/workspace/dev
+git clone https://github.com/knodir/son-emu.git
+cd son-emu/ansible
+sudo ansible-playbook install.yml
+cd ..
+sudo python setup.py install
+
+
+Follow these steps to install on VirtualBox VM
+
 git clone https://github.com/knodir/son-emu
 cd son-emu
 git checkout dev
