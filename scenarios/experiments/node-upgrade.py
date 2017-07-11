@@ -235,13 +235,16 @@ def nodeUpgrade():
     print('< wait complete')
     print('VPN client VNF started')
 
-     # manually chain routing table entries on VNFs
+    # rewrite client and NAT VNF MAC addresses for tcpreplay
+    cmds.append('sudo docker exec -i mn.client /bin/bash -c "ifconfig intf1 hw ether 00:00:00:00:00:01"')
+    cmds.append('sudo docker exec -i mn.nat /bin/bash -c "ifconfig input hw ether 00:00:00:00:00:02"')
+    # manually chain routing table entries on VNFs
     cmds.append('sudo docker exec -i mn.client /bin/bash -c "route add -net 10.0.0.0/16 dev intf1"')
     cmds.append('sudo docker exec -i mn.client /bin/bash -c "route add -net 10.8.0.0/24 dev intf1"')
     cmds.append('sudo docker exec -i mn.nat /bin/bash -c "route add -net 10.0.10.0/24 dev output"')
     cmds.append('sudo docker exec -i mn.nat /bin/bash -c "ip route add 10.8.0.0/24 dev output"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids1"')
-    cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids2"')
+    # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids2"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "ip route del 10.0.10.10/32"')
     cmds.append('sudo docker exec -i mn.server /bin/bash -c "route add -net 10.0.0.0/24 dev intf2"')
 

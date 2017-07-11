@@ -1,51 +1,87 @@
 import time
 import subprocess
 import logging
+import os
 
 from emuvim.dcemulator.net import DCNetwork
 from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
+from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM
+from emuvim.dcemulator.resourcemodel import ResourceModelRegistrar
 
 from mininet.log import setLogLevel, info
 from mininet.node import RemoteController
 from mininet.clean import cleanup
-from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM, UpbOverprovisioningCloudDcRM
-import os
 
 
 def prepareDC():
     """ Prepares physical topology to place chains. """
 
-    # net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
-    # # add one data center
-    # dc = net.addDatacenter('dc1', metadata={'node-upgrade'})
+    # We use Sonata data center construct to simulate physical servers (just
+    # servers hereafter). The reason is that Sonata DC has CPU/RAM resource
+    # constraints just like the servers. We also model the links between servers
+    # with bandwidth constraints of Sonata switch-to-DC link.
 
-    # # create REST API endpoint
-    # api = RestApiEndpoint("0.0.0.0", 5001)
+    # The topology we create below is one rack with two servers. The rack has
+    # ToR switches (Sonata switch called "tor1"), to place chain VNFs.
 
-    # # connect API endpoint to containernet
-    # api.connectDCNetwork(net)
+    # Similar to the paper story of middlebox-as-a-server, we will put client
+    # and server (traffic source and sink) outside the DC.
 
-    # # connect data centers to the endpoint
-    # api.connectDatacenter(dc)
+    # Here is the reason why we do not use Sonata "host" to model the servers.
+    # Sonata uses Mininet host construct as-is. Mininet "host" supports only CPU
+    # resource constraint. Therefore, we do not use Sonata "host" construct.
 
-    # # start API and containernet
-    # api.start()
-    # net.start()
+    # Unless otherwise specified, we always use "server" for variables and
+    # description instead of "DC". This should avoid confusion with terminology.
 
-    net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
-    # add 3 data centers
-    client_dc = net.addDatacenter('client-dc')
-    chain_dc = net.addDatacenter('chain-dc')
-    server_dc = net.addDatacenter('server-dc')
+    # add resource model (rm) to limit cpu/ram available in each server. We
+    # create one resource mode and use it for all servers, meaning all of our
+    # servers are homogeneous. Create multiple RMs for heterogeneous servers
+    # (with different amount of cpu,ram).
+    MAX_CU = 128  # max compute units
+    MAX_MU = 8192  # max memory units
+
+    # the cpu, ram resource above are consumed by VNFs with one of these
+    # flavors. For some reason memory allocated for tiny flavor is 42 MB,
+    # instead of 32 MB in this systems. Other flavors are multipliers of this
+    # 42 MB (as expected).
+    # "tiny",  {"compute": 0.5, "memory": 32, "disk": 1}
+    # "small",  {"compute": 1.0, "memory": 128, "disk": 20}
+    # "medium",  {"compute": 4.0, "memory": 256, "disk": 40}
+    # "large",  {"compute": 8.0, "memory": 512, "disk": 80}
+    # "xlarge",  {"compute": 16.0, "memory": 1024, "disk": 160}
+    #
+    # Note that all these container VNFs need at least 500 MB of memory to be
+    # able to work. Firewall in particular, runs OVS, needs more than 1 GB to be
+    # able to process packets. If you do not allocate sufficient CPU, system
+    # behaves bad. In most cases all physical cores gets pinned (probably
+    # because of the contention between OVS and cgroup mem limitation) and
+    # Sonata VM OOM killer starts killing random processes.
+
+    net = DCNetwork(controller=RemoteController, monitor=True,
+                    dc_emulation_max_cpu=MAX_CU, dc_emulation_max_mem=MAX_MU,
+                    enable_learning=True)
+
+    reg = ResourceModelRegistrar(MAX_CU, MAX_MU)
+    rm = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    reg.register("homogeneous_rm", rm)
+
+    # add 3 servers
+    off_cloud = net.addDatacenter('off-cloud')  # place client/server VNFs
+    chain_server1 = net.addDatacenter('chain-server1')
+    chain_server2 = net.addDatacenter('chain-server2')
+
+    off_cloud.assignResourceModel(rm)
+    chain_server1.assignResourceModel(rm)
+    chain_server2.assignResourceModel(rm)
 
     # connect data centers with switches
-    s1 = net.addSwitch('s1')
-    # s2 = net.addSwitch('s2')
+    tor1 = net.addSwitch('tor1')
 
     # link data centers and switches
-    net.addLink(client_dc, s1)
-    net.addLink(chain_dc, s1)
-    net.addLink(server_dc, s1)
+    net.addLink(off_cloud, tor1)
+    net.addLink(chain_server1, tor1)
+    net.addLink(chain_server2, tor1)
 
     # create REST API endpoint
     api = RestApiEndpoint("0.0.0.0", 5001)
@@ -54,15 +90,15 @@ def prepareDC():
     api.connectDCNetwork(net)
 
     # connect data centers to the endpoint
-    api.connectDatacenter(client_dc)
-    api.connectDatacenter(chain_dc)
-    api.connectDatacenter(server_dc)
+    api.connectDatacenter(off_cloud)
+    api.connectDatacenter(chain_server1)
+    api.connectDatacenter(chain_server2)
 
     # start API and containernet
     api.start()
     net.start()
 
-    return (net, api, [client_dc, chain_dc, server_dc])
+    return (net, api, [off_cloud, chain_server1, chain_server2])
     # return (net, dc, api)
 
 
