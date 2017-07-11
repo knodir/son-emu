@@ -1,21 +1,14 @@
 {
-	"Servers": [{
-		"off-cloud0": [8, 32, 10]
-	}, {
-		"off-cloud1": [8, 32, 10]
-	}, {
-		"off-cloud2": [8, 32, 10]
-	}, {
-		"off-cloud3": [8, 32, 10]
-	}, {
-		"chain-server0": [8, 32, 10]
-	}, {
-		"chain-server1": [8, 32, 10]
-	}, {
-		"chain-server2": [8, 32, 10]
-	}, {
+	"Servers": {
+		"off-cloud0": [8, 32, 10],
+		"off-cloud1": [8, 32, 10],
+		"off-cloud2": [8, 32, 10],
+		"off-cloud3": [8, 32, 10],
+		"chain-server0": [8, 32, 10],
+		"chain-server1": [8, 32, 10],
+		"chain-server2": [8, 32, 10],
 		"chain-server3": [8, 32, 10]
-	}],
+	},
 	"PN": [
 		["off-cloud0", "tor0", 10],
 		["off-cloud1", "tor0", 10],
