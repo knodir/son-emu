@@ -1,5 +1,7 @@
 import time
 import subprocess
+from subprocess import check_call
+from subprocess import CalledProcessError
 import logging
 import json
 
@@ -131,21 +133,39 @@ def prepareDC(pn_fname):
 
 
 def get_placement(pn_fname, vn_fname):
-    """ Return chain placement with NetSolver. """
+    """ Does chain placement with NetSolver and returns the output. """
+
+    out_fname = '/tmp/ns_out.json'
+    cmd = "export PYTHONHASHSEED=1 && python3 %s %s %s --output %s --no-repeat" % (
+            "../../../monosat_datacenter/src/vdcmapper.py", pn_fname, vn_fname,
+            out_fname)
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+    if execStatus == 1:
+        print("allocation failed")
+        return execStatus
+
+    print("allocation succeeded")
+    # Read physical topology from file.
+    with open(out_fname) as data_file:
+        allocs = json.load(data_file)
+
+    # data is in following format
+    # {'allocation_0':
+    #   {'assignment': [['fw', 'chain-server1'],
+    #                   ['ids', 'chain-server1']},
+    #   {'bandwidth': []},
+    # 'allocation_1': ...}
+    # }
+    return allocs
 
 
-
-
-def nodeUpgrade(pn):
+def allocate_chains(dcs, allocs):
     """ Implements node-upgrade scenario. TBD. """
 
     cmds = []
-    net, api, dcs, tors = prepareDC(pn)
     fl = "large"
-
-    net.CLI()
-    net.stop()
-    return
 
     # create client with one interface
     client = off_cloud.startCompute("client", image='knodir/client',
@@ -300,6 +320,14 @@ if __name__ == '__main__':
     # logging.basicConfig(level=logging.INFO)
 
     pn_fname = "../topologies/e2-1rack-8servers.pn.json"
+    vn_fname = "../topologies/e2-chain-4vnfs.vn.json"
 
-    nodeUpgrade(pn_fname)
+    net, api, dcs, tors = prepareDC(pn)
+    allocs = get_placement(pn_fname, vn_fname)
+
+    # allocate_chains(dcs, allocs)
+
+    #net.CLI()
+    #net.stop()
+
     cleanup()
