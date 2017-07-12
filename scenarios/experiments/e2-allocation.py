@@ -38,10 +38,10 @@ def prepareDC():
     # create one resource mode and use it for all servers, meaning all of our
     # servers are homogeneous. Create multiple RMs for heterogeneous servers
     # (with different amount of cpu,ram).
-    MAX_CU_E52680 = 40  # max compute units
-    MAX_CU_E52650 = 20  # max compute units
-    MAX_MU_E52680 = 2000  # max memory units
-    MAX_MU_E52650 = 2000  # max memory units
+    MAX_CU_E52680 = 20  # max compute units
+    MAX_CU_E52650 = 16  # max compute units
+    MAX_MU_E52680 = 4000  # max memory units
+    MAX_MU_E52650 = 4000  # max memory units
 
     # the cpu, ram resource above are consumed by VNFs with one of these
     # flavors. For some reason memory allocated for tiny flavor is 42 MB,
@@ -61,28 +61,41 @@ def prepareDC():
     # Sonata VM OOM killer starts killing random processes.
 
     net = DCNetwork(controller=RemoteController, monitor=True,
-                    dc_emulation_max_cpu=100, dc_emulation_max_mem=30000,
+                    dc_emulation_max_cpu=1.0, dc_emulation_max_mem=25000,
                     enable_learning=True)
 
-    reg_E52680 = ResourceModelRegistrar(max_cu=MAX_CU_E52680, max_mu=MAX_MU_E52680)
-    rm_E52680 = UpbSimpleCloudDcRM(max_cu=MAX_CU_E52680, max_mu=MAX_MU_E52680)
-    reg_E52650 = ResourceModelRegistrar(max_cu=MAX_CU_E52650, max_mu=MAX_MU_E52650)
-    rm_E52650 = UpbSimpleCloudDcRM(max_cu=MAX_CU_E52650, max_mu=MAX_MU_E52650)
-    reg_E52680.register("homogeneous_rm_E52680", rm_E52680)
-    reg_E52650.register("homogeneous_rm_E52650", rm_E52650)
+    reg_E52680_1 = ResourceModelRegistrar(MAX_CU_E52680, MAX_MU_E52680)
+    reg_E52680_2 = ResourceModelRegistrar(MAX_CU_E52680, MAX_MU_E52680)
+    reg_E52650_1 = ResourceModelRegistrar(MAX_CU_E52650, MAX_MU_E52650)
+    reg_E52650_2 = ResourceModelRegistrar(MAX_CU_E52650, MAX_MU_E52650)
+    reg_E52650_3 = ResourceModelRegistrar(MAX_CU_E52650, MAX_MU_E52650)
 
-    # add 3 servers
+    rm_E52680_1 = UpbSimpleCloudDcRM(MAX_CU_E52680, MAX_MU_E52680)
+    rm_E52680_2 = UpbSimpleCloudDcRM(MAX_CU_E52680, MAX_MU_E52680)
+
+    rm_E52650_1 = UpbSimpleCloudDcRM(MAX_CU_E52650, MAX_MU_E52650)
+    rm_E52650_2 = UpbSimpleCloudDcRM(MAX_CU_E52650, MAX_MU_E52650)
+    rm_E52650_3 = UpbSimpleCloudDcRM(MAX_CU_E52650, MAX_MU_E52650)
+
+    reg_E52680_1.register("homogeneous_rm_E52680_1", rm_E52680_1)
+    reg_E52680_2.register("homogeneous_rm_E52680_2", rm_E52680_2)
+
+    reg_E52650_1.register("homogeneous_rm_E52650_1", rm_E52650_1)
+    reg_E52650_2.register("homogeneous_rm_E52650_2", rm_E52650_2)
+    reg_E52650_3.register("homogeneous_rm_E52650_3", rm_E52650_3)
+
+    # add 5 servers
     off_cloud = net.addDatacenter('off-cloud')  # place client/server VNFs
     chain_server1 = net.addDatacenter('chain-server1')
     chain_server2 = net.addDatacenter('chain-server2')
     chain_server3 = net.addDatacenter('chain-server3')
     chain_server4 = net.addDatacenter('chain-server4')
 
-    off_cloud.assignResourceModel(rm_E52650)
-    chain_server1.assignResourceModel(rm_E52650)
-    chain_server2.assignResourceModel(rm_E52680)
-    chain_server3.assignResourceModel(rm_E52650)
-    chain_server4.assignResourceModel(rm_E52650)
+    off_cloud.assignResourceModel(rm_E52680_1)
+    chain_server1.assignResourceModel(rm_E52650_1)
+    chain_server2.assignResourceModel(rm_E52680_2)
+    chain_server3.assignResourceModel(rm_E52650_2)
+    chain_server4.assignResourceModel(rm_E52650_3)
     # connect data centers with switches
     tor1 = net.addSwitch('tor1')
 
@@ -121,6 +134,14 @@ def scaleOut():
     net, api, dcs = prepareDC()
     off_cloud, cs1, cs2, cs3, cs4 = dcs[0], dcs[1], dcs[2], dcs[3], dcs[4]
     fl = "large"
+
+    # Test to verify resource allocation
+    # for test in range(10):
+    #     # create client with one interface
+    #     client = off_cloud.startCompute("client" + str(test), image='knodir/client',
+    #                                     flavor_name=fl,
+    #                                     network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+    #     client.sendCmd('sudo ifconfig intf1 hw ether 00:00:00:00:00:1')
 
     # create client with one interface
     client = off_cloud.startCompute("client", image='knodir/client',
