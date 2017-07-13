@@ -8,11 +8,11 @@
 		"sink": [0.125, 0.5, 1]
 	},
 	"VN": [
-		["source", "nat", 1],
-		["nat", "fw", 1],
+		["source", "nat", 2],
+		["nat", "fw", 2],
 		["fw", "ids", 1],
 		["fw", "vpn", 1],
 		["ids", "vpn", 1],
-		["vpn", "sink", 1]
+		["vpn", "sink", 2]
 	]
 }
