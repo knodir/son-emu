@@ -31,13 +31,17 @@ def extract_dstat(fname, pos):
         for row in reader:
             # print(row)
             if pos == 1:
-                val = row['Dstat 0.7.3 CSV output']
+                try:
+                    val = row['Dstat 0.7.3 CSV output']
+                except KeyError:
+                    val = row['Dstat 0.7.2 CSV output']
             else:
                 val = row[None][0]
-            # print(val)
-            if val.isdigit():
+            sep = '.'
+            rest = val.split(sep, 1)[0]
+            if rest.isdigit():
                 # multiply to 8 to convert byte to bit (dstat reports on bytes)
-                mbps = 8 * int(val) / 1048576  # = (1024 * 1024)
+                mbps = 8 * int(rest) / 1048576  # = (1024 * 1024)
                 bw.append(mbps)
 
     # we need to trim first 3 seconds as dstat monitoring starts 3 seconds
@@ -46,6 +50,7 @@ def extract_dstat(fname, pos):
     # we also care about only 60s execution since iperf3 terminates after 60s
     bw = bw[:60]
     return bw
+
 
 
 def plot_upgrade():
@@ -94,10 +99,10 @@ def plot_scaleout():
 
     # for all other VNFs we monitor RX traffic, which is the value on the 1st
     # position of the CSV file.
-    ids1_bw = extract_dstat('./results/scaleout-from-ids1.csv', 1)
+    ids1_bw = extract_dstat('./results/scaleout-from-ids1.csv', 2)
     print('ids1_bw = %s, len = %d' % (ids1_bw, len(ids1_bw)))
 
-    vpn_bw = extract_dstat('./results/scaleout-from-vpn.csv', 1)
+    vpn_bw = extract_dstat('./results/scaleout-from-vpn.csv', 2)
     print('vpn_bw = %s, len = %d' % (vpn_bw, len(vpn_bw)))
 
     figure_name = 'results/scaleout.png'
@@ -108,6 +113,7 @@ def plot_scaleout():
     axes = plt.gca()
     plt.xlabel('Time (s)')
     plt.ylabel('Bandwidth (Mbps)')
+    plt.ylim([0,10])
     client = plt.plot(t, client_bw, 'r--', label='Client')
     ids1 = plt.plot(t, ids1_bw, 'g--', label='IDS1')
     vpn = plt.plot(t, vpn_bw, 'k--', label='VPN')

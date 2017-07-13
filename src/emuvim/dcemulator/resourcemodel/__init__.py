@@ -83,6 +83,7 @@ class ResourceFlavor(object):
     Simple class that represents resource flavors (c.f. OpenStack).
     Can contain arbitrary metrics.
     """
+
     def __init__(self, name, metrics):
         self.name = name
         self._metrics = metrics
@@ -114,15 +115,32 @@ class BaseResourceModel(object):
         initialize some default flavours (naming/sizes inspired by OpenStack)
         """
         self.addFlavour(ResourceFlavor(
-            "tiny",  {"compute": 0.5, "memory": 32, "disk": 1}))
+            "tiny", {"compute": 0.5, "memory": 32, "disk": 1}))
         self.addFlavour(ResourceFlavor(
-            "small",  {"compute": 1.0, "memory": 128, "disk": 20}))
+            "small", {"compute": 1.0, "memory": 128, "disk": 20}))
         self.addFlavour(ResourceFlavor(
-            "medium",  {"compute": 4.0, "memory": 256, "disk": 40}))
+            "medium", {"compute": 4.0, "memory": 256, "disk": 40}))
         self.addFlavour(ResourceFlavor(
-            "large",  {"compute": 8.0, "memory": 512, "disk": 80}))
+            "large", {"compute": 8.0, "memory": 512, "disk": 80}))
         self.addFlavour(ResourceFlavor(
-            "xlarge",  {"compute": 16.0, "memory": 1024, "disk": 160}))
+            "xlarge", {"compute": 16.0, "memory": 1024, "disk": 160}))
+
+        self.addFlavour(ResourceFlavor(
+            "nat", {"compute": 1, "memory": 512, "disk": 20}))    # CPU: 1/8 Memory: 1/2
+        self.addFlavour(ResourceFlavor(
+            "vpn", {"compute": 2, "memory": 512, "disk": 20}))    # CPU: 1/4 Memory: 1/2
+        self.addFlavour(ResourceFlavor(
+            "gw", {"compute": 2, "memory": 512, "disk": 20}))     # CPU: 1/4 Memory: 1/2
+        self.addFlavour(ResourceFlavor(
+            "wc", {"compute": 2, "memory": 1536, "disk": 20}))    # CPU: 1/4 Memory: 3/2
+        self.addFlavour(ResourceFlavor(
+            "re", {"compute": 2, "memory": 1536, "disk": 20}))    # CPU: 1/4 Memory: 3/2
+        self.addFlavour(ResourceFlavor(
+            "fw", {"compute": 3, "memory": 512, "disk": 20}))     # CPU: 3/8 Memory: 1/2
+        self.addFlavour(ResourceFlavor(
+            "lb", {"compute": 3, "memory": 1024, "disk": 20}))    # CPU: 3/8 Memory: 1
+        self.addFlavour(ResourceFlavor(
+            "ids", {"compute": 4, "memory": 2048, "disk": 20}))   # CPU: 1/2 Memory: 2
 
     def addFlavour(self, fl):
         """
