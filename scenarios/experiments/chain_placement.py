@@ -1,4 +1,6 @@
 import time
+import sys
+import random
 import subprocess
 from subprocess import check_call
 from subprocess import CalledProcessError
@@ -10,14 +12,14 @@ from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
 from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM
 from emuvim.dcemulator.resourcemodel import ResourceModelRegistrar
 
-
-from mininet.log import setLogLevel, info
 from mininet.node import RemoteController
 from mininet.clean import cleanup
 from mininet.net import Containernet
 from mininet.node import Controller, Docker, OVSSwitch
 from mininet.cli import CLI
 from mininet.link import TCLink, Link
+
+import glog
 
 
 def prepareDC(pn_fname):
@@ -73,7 +75,7 @@ def prepareDC(pn_fname):
     with open(pn_fname) as data_file:
         data = json.load(data_file)
 
-    print('read data center description from JSON file %s' % data['Servers'])
+    glog.info('read data center description from JSON file %s' % data['Servers'])
 
     dcs = {}
     for name, props in data['Servers'].iteritems():
@@ -85,35 +87,35 @@ def prepareDC(pn_fname):
 
     for dc_name, dc_obj in dcs.iteritems():
         dc_obj.assignResourceModel(rm)
-        print('assigned resource model to %s' % dc_name)
+        glog.info('assigned resource model to %s' % dc_name)
 
 
     # Extract ToR switch names. Thyse are the ones not listed as 'Servers'
-    print('PN read from JSON file %s' % data['PN'])
+    glog.info('PN read from JSON file %s' % data['PN'])
 
     tors = {}
 
     for pn_item in data['PN']:
         if (pn_item[0] not in data['Servers'].keys()) and (
                 pn_item[0] not in tors.keys()):
-            # print(pn_item[0])
+            # glog.info(pn_item[0])
             tors[pn_item[0]] = None
 
         if (pn_item[1] not in data['Servers'].keys()) and (
                 pn_item[1] not in tors.keys()):
-            # print(pn_item[1])
+            # glog.info(pn_item[1])
             tors[pn_item[1]] = None
 
     # connect ToR switches and DC per PN topology
     for tor_name in tors.keys():
         tors[tor_name] = net.addSwitch(tor_name)
 
-    print('ToR switch name and objects: %s' % tors)
+    glog.info('ToR switch name and objects: %s' % tors)
 
     for pn_item in data['PN']:
         net.addLink(dcs[pn_item[0]], tors[pn_item[1]])
 
-    print('added link from DCs to ToR')
+    glog.info('added link from DCs to ToR')
 
     # create REST API endpoint
     api = RestApiEndpoint("0.0.0.0", 5001)
@@ -132,33 +134,160 @@ def prepareDC(pn_fname):
     return (net, api, dcs, tors)
 
 
-def get_placement(pn_fname, vn_fname):
+def get_placement(pn_fname, vn_fname, algo):
     """ Does chain placement with NetSolver and returns the output. """
 
-    out_fname = '/tmp/ns_out.json'
-    cmd = "export PYTHONHASHSEED=1 && python3 %s %s %s --output %s --no-repeat" % (
-            "../../../monosat_datacenter/src/vdcmapper.py", pn_fname, vn_fname,
-            out_fname)
-    execStatus = subprocess.call(cmd, shell=True)
-    print('returned %d from %s (0 is success)' % (execStatus, cmd))
+    if algo == 'netsolver':
+        glog.info('using NetSolver for chain allocation')
 
-    if execStatus == 1:
-        print("allocation failed")
-        return execStatus
+        out_fname = '/tmp/ns_out.json'
+        cmd = "export PYTHONHASHSEED=1 && python3 %s %s %s --output %s --no-repeat" % (
+                "../../../monosat_datacenter/src/vdcmapper.py", pn_fname, vn_fname,
+                out_fname)
+        execStatus = subprocess.call(cmd, shell=True)
+        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
 
-    print("allocation succeeded")
-    # Read physical topology from file.
-    with open(out_fname) as data_file:
-        allocs = json.load(data_file)
+        if execStatus == 1:
+            glog.info("allocation failed")
+            return execStatus
+
+        glog.info("allocation succeeded")
+        # Read physical topology from file.
+        with open(out_fname) as data_file:
+            allocs = json.load(data_file)
+        return allocs
+
+    # Read physical network from file.
+    with open(pn_fname) as data_file:
+        pn = json.load(data_file)
+
+    # Read virtual network from file.
+    with open(vn_fname) as data_file:
+        vn = json.load(data_file)
+
+    # get 'off-cloud' and 'chain-server' server names on a separate list. We
+    # place 'source' and 'sink' VNFs on 'off-cloud', and all other VNFs on the
+    # 'chain-server's. This is done to replicate E2 experiment, where traffic
+    # generator VNF (source) and traffic sink is placed on different servers
+    # (from VNFs).
+    off_cloud = []
+    chain_server = []
+    for server_name in pn['Servers']:
+        if server_name.startswith('off-cloud'):
+            off_cloud.append(server_name)
+        elif server_name.startswith('chain-server'):
+            chain_server.append(server_name)
+        else:
+            glog.info('ERROR: unknown server type %s', server_name)
+            sys.exit(1)
+
+    glog.info('off_cloud: %s', off_cloud)
+    glog.info('chain_server: %s', chain_server)
+
+    # candidate_servers contains list of server names which have enough capacity
+    # [cpu, ram, bandwidth] to host this VNF.
+    candidate_servers = []
+    allocations = {}
+    assignments, bandwidth = [], []
+    chain_index = 0
+    enough_resources = True
+
+    # loop until servers have resources to host VNFs. Note that partial chain
+    # allocations are invalid and we ignore them (at the end of the loop).
+    while enough_resources:
+        for vnf_name in vn['VMs']:
+            
+            # iterate through each server and add it to the candidate_servers
+            # list if it has enough resources to host this VNF. Then we select
+            # one of these servers based on the algorithm. RoundRobin randomly
+            # chooses a server from candidates while DepthFirst always chooses
+            # the first server on the list.
+            # Note that pn['Servers'][sname] represents [cpu, ram, bandwidth]
+            # capacity of the server and vn['VMs'][vnf_name] represents VNF
+            # capacity in the same order.
+            if vnf_name == 'source' or vnf_name == 'sink':
+                # sname means 'server name'
+                for sname in off_cloud:
+                    if (pn['Servers'][sname][0]-vn['VMs'][vnf_name][0] >= 0) and (
+                            pn['Servers'][sname][1]-vn['VMs'][vnf_name][1] >= 0) and (
+                            pn['Servers'][sname][2]-vn['VMs'][vnf_name][2] >= 0):
+                        glog.info('%s has enough resources [%.4f, %.4f, %.4f]' +
+                                ' to host %s [%.4f, %.4f, %.4f]', 
+                            sname, pn['Servers'][sname][0],
+                            pn['Servers'][sname][1], pn['Servers'][sname][2],
+                            vnf_name, vn['VMs'][vnf_name][0],
+                            vn['VMs'][vnf_name][1], vn['VMs'][vnf_name][2])
+                        candidate_servers.append(sname)
+            else: # this is a chain VNF
+                for sname in chain_server:
+                    if (pn['Servers'][sname][0]-vn['VMs'][vnf_name][0] >= 0) and (
+                            pn['Servers'][sname][1]-vn['VMs'][vnf_name][1] >= 0) and (
+                            pn['Servers'][sname][2]-vn['VMs'][vnf_name][2] >= 0):
+                        glog.info('%s has enough resources [%.4f, %.4f, %.4f]' +
+                                ' to host %s [%.4f, %.4f, %.4f]',
+                            sname, pn['Servers'][sname][0],
+                            pn['Servers'][sname][1], pn['Servers'][sname][2],
+                            vnf_name, vn['VMs'][vnf_name][0],
+                            vn['VMs'][vnf_name][1], vn['VMs'][vnf_name][2])
+                        candidate_servers.append(sname)
+
+            if len(candidate_servers) == 0:
+                # no more VNF allocation possible. We can ignore the last
+                # partial chain allocation since chains have to be fully
+                # allocated to be a valid allocation.
+                glog.info('candidate_servers is empty. No more allocation is' +
+                    ' possible. Completed %d allocations.', (chain_index+1))
+                enough_resources = False
+                break
+
+            if algo == 'round-robin':
+                # randomly choose a server from the candidate list
+                sname = random.choice(candidate_servers)
+            elif algo == 'depth-first':
+                # always choose the first server on the list. Note that Python
+                # retains an order items appended to the list. Because
+                # 'off_cloud' and 'chain_server' lists are constant, and we
+                # iterate through these lists and append them into
+                # 'candidate_servers' in the same order, choosing the first
+                # server on the list always going to be the same server (as long
+                # as it has enough resources to host the VNF). This is exactly
+                # how depth-first algorithm operates.
+                sname = candidate_servers[0]
+
+            # empty candidate_servers for the next iteration
+            candidate_servers = []
+            # decrease available resources from the chosen server
+            pn['Servers'][sname][0] -= vn['VMs'][vnf_name][0]
+            pn['Servers'][sname][1] -= vn['VMs'][vnf_name][1]
+            pn['Servers'][sname][2] -= vn['VMs'][vnf_name][2]
+
+            assignments.append([vnf_name, sname])
+            # glog.info('assignments = %s', assignments)
+        
+        if enough_resources:
+            allocations['allocation_%d' % chain_index] = {
+                    'assignment': assignments, 'bandwidth': bandwidth}
+
+            # increment chain index and renew assignment after completing each
+            # chain allocation
+            chain_index += 1
+            assignments = []
+
+        # watchdog to prevent infinite loop
+        if chain_index > 30: # some impossible number of allocations
+            glog.info('ERROR: chain_index = %d' % chain_index)
+            break
 
     # "allocs" has the following format
     # {'allocation_0':
-    #   {'assignment': [['fw', 'chain-server1'],
+    #   {'assignment': [['fw', 'chain-server0'],
     #                   ['ids', 'chain-server1']],
     #   {'bandwidth': []},
     # 'allocation_1': ...}
     # }
-    return allocs
+
+    # glog.info('allocations: %s' % allocations)
+    return allocations
 
 
 def allocate_chains(dcs, allocs):
@@ -172,17 +301,18 @@ def allocate_chains(dcs, allocs):
 
     # iterate over each allocation and create each chain
     for alloc_name, chain_mapping in allocs.iteritems():
-        print('started allocating chain: %d' % chain_index)
+        glog.info('started allocating chain: %d', chain_index)
 
-        # iterate over each chain and create chain VNFs
+        # iterate over each chain and create chain VNFs by placing it on an
+        # appropriate server (such as chosen by NetSolver)..
         for vnf_mapping in chain_mapping['assignment']:
-            print('vnf_mapping = %s' % vnf_mapping)
+            glog.info('vnf_mapping = %s', vnf_mapping)
             vnf_name = vnf_mapping[0]
             server_name = vnf_mapping[1]
             vnf_prefix = 'chain%d' % chain_index
             vnf_id = '%s-%s' % (vnf_prefix, vnf_name)
             vnf_obj = None
-            print('creating %s on %s' % (vnf_id, server_name))
+            glog.info('creating %s on %s', vnf_id, server_name)
 
             if vnf_name == 'source':
                 # create client with one interface
@@ -245,12 +375,12 @@ def allocate_chains(dcs, allocs):
                 vnfs[vnf_name].append({vnf_id: vnf_obj})
 
             else:
-                print('ERROR: unknown VNF type: %s' % vnf_name)
-                os.exit(1)
+                glog.error('ERROR: unknown VNF type: %s', vnf_name)
+                sys.exit(1)
 
-            print('successfully created VNF: %s' % vnf_id)
+            glog.info('successfully created VNF: %s', vnf_id)
 
-        print('successfully created chain: %d' % chain_index)
+        glog.info('successfully created chain: %d', chain_index)
         chain_index += 1
 
     return vnfs
@@ -268,30 +398,30 @@ def plumb_chains(vnfs):
         fw_name = fw_name_and_obj.keys()[0]
         cmd = 'sudo docker exec -i mn.%s /bin/bash /root/start.sh &' % fw_name
         execStatus = subprocess.call(cmd, shell=True)
-        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+        glog.info('returned %d from %s (0 is success)' % (execStatus, cmd))
 
     return
 
-    print('> sleeping 10s to wait ryu controller initialize')
+    glog.info('> sleeping 10s to wait ryu controller initialize')
     time.sleep(10)
-    print('< wait complete')
-    print('fw start done')
+    glog.info('< wait complete')
+    glog.info('fw start done')
 
     # execute /start.sh script inside ids image. It bridges input and output
     # interfaces with br0, and starts ids process listering on br0.
     cmd = 'sudo docker exec -i mn.ids1 /bin/bash -c "sh /start.sh"'
     execStatus = subprocess.call(cmd, shell=True)
-    print('returned %d from ids1 start.sh start (0 is success)' % execStatus)
+    glog.info('returned %d from ids1 start.sh start (0 is success)' % execStatus)
 
     cmd = 'sudo docker exec -i mn.ids2 /bin/bash -c "sh /start.sh"'
     execStatus = subprocess.call(cmd, shell=True)
-    print('returned %d from ids2 start.sh start (0 is success)' % execStatus)
+    glog.info('returned %d from ids2 start.sh start (0 is success)' % execStatus)
 
     # execute /start.sh script inside nat image. It attaches both input
     # and output interfaces to OVS bridge to enable packet forwarding.
     cmd = 'sudo docker exec -i mn.nat /bin/bash /start.sh'
     execStatus = subprocess.call(cmd, shell=True)
-    print('returned %d from nat start.sh start (0 is success)' % execStatus)
+    glog.info('returned %d from nat start.sh start (0 is success)' % execStatus)
 
     # chain 'client <-> nat <-> fw <-> ids <-> vpn <-> server'
     net.setChain('client', 'nat', 'intf1', 'input', bidirectional=True,
@@ -327,13 +457,13 @@ def plumb_chains(vnfs):
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
-        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+        glog.info('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
-    print('> sleeping 60s to VPN client initialize...')
+    glog.info('> sleeping 60s to VPN client initialize...')
     time.sleep(60)
-    print('< wait complete')
-    print('VPN client VNF started')
+    glog.info('< wait complete')
+    glog.info('VPN client VNF started')
 
     # rewrite client and NAT VNF MAC addresses for tcpreplay
     cmds.append('sudo docker exec -i mn.client /bin/bash -c "ifconfig intf1 hw ether 00:00:00:00:00:01"')
@@ -353,29 +483,44 @@ def plumb_chains(vnfs):
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
-        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+        glog.info('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
-    print('ping client -> server after explicit chaining. Packet drop %s%%' %
+    glog.info('ping client -> server after explicit chaining. Packet drop %s%%' %
           net.ping([client, server], timeout=5))
 
     net.CLI()
     net.stop()
 
-#def send_traffic(vnfs):
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
-    # logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger()
+    print('logger handlers = %s' % logger.handlers)
+    if len(logger.handlers) > 1:
+        # when glog is included, system will just adds it as an additional log
+        # handler resulting into each message being printed twice (which is bad).
+        # We drop all handlers except the last one, assuming the last one is
+        # glog (which seems always to be true). Comment out these lines if you
+        # see different behaviour
+        logger.handlers = logger.handlers[len(logger.handlers)-1:]
+    print('logger handlers = %s' % logger.handlers)
 
     pn_fname = "../topologies/e2-1rack-8servers.pn.json"
     vn_fname = "../topologies/e2-chain-4vnfs.vn.json"
 
     net, api, dcs, tors = prepareDC(pn_fname)
-    allocs = get_placement(pn_fname, vn_fname)
+    algos = ['netsolver', 'round-robin', 'depth-first']
+    # allocs = get_placement(pn_fname, vn_fname, algos[0]) # netsolver
+    # allocs = get_placement(pn_fname, vn_fname, algos[1]) # round-robin
+    allocs = get_placement(pn_fname, vn_fname, algos[2]) # depth-first
 
+    glog.info('allocs: %s' % allocs)
+    # sys.exit(0)
+
+    # allocate chains by placing them on appropriate servers
     vnfs = allocate_chains(dcs, allocs)
 
+    # configure the datapath on chains to push packets through them
     plumb_chains(vnfs)
 
     net.CLI()
