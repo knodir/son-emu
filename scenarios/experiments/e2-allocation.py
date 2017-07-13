@@ -38,10 +38,8 @@ def prepareDC():
     # create one resource mode and use it for all servers, meaning all of our
     # servers are homogeneous. Create multiple RMs for heterogeneous servers
     # (with different amount of cpu,ram).
-    MAX_CU_E52680 = 20  # max compute units
-    MAX_CU_E52650 = 16  # max compute units
-    MAX_MU_E52680 = 4000  # max memory units
-    MAX_MU_E52650 = 4000  # max memory units
+    MAX_CU = 8  # max compute units
+    MAX_MU = 3500  # max compute units
 
     # the cpu, ram resource above are consumed by VNFs with one of these
     # flavors. For some reason memory allocated for tiny flavor is 42 MB,
@@ -61,50 +59,62 @@ def prepareDC():
     # Sonata VM OOM killer starts killing random processes.
 
     net = DCNetwork(controller=RemoteController, monitor=True,
-                    dc_emulation_max_cpu=1.0, dc_emulation_max_mem=25000,
+                    dc_emulation_max_cpu=64, dc_emulation_max_mem=28000,
                     enable_learning=True)
 
-    reg_E52680_1 = ResourceModelRegistrar(MAX_CU_E52680, MAX_MU_E52680)
-    reg_E52680_2 = ResourceModelRegistrar(MAX_CU_E52680, MAX_MU_E52680)
-    reg_E52650_1 = ResourceModelRegistrar(MAX_CU_E52650, MAX_MU_E52650)
-    reg_E52650_2 = ResourceModelRegistrar(MAX_CU_E52650, MAX_MU_E52650)
-    reg_E52650_3 = ResourceModelRegistrar(MAX_CU_E52650, MAX_MU_E52650)
+    # create registrars
+    # reg_E52680 = ResourceModelRegistrar(MAX_CU_E52680, MAX_MU_E52680)
+    # reg_E52680_2 = ResourceModelRegistrar(MAX_CU_E52680, MAX_MU_E52680)
+    # reg_E52650 = ResourceModelRegistrar(MAX_CU_E52650, MAX_MU_E52650)
+    # reg_E52650_2 = ResourceModelRegistrar(MAX_CU_E52650, MAX_MU_E52650)
+    # reg_E52650_3 = ResourceModelRegistrar(MAX_CU_E52650, MAX_MU_E52650)
 
-    rm_E52680_1 = UpbSimpleCloudDcRM(MAX_CU_E52680, MAX_MU_E52680)
-    rm_E52680_2 = UpbSimpleCloudDcRM(MAX_CU_E52680, MAX_MU_E52680)
+    # create data center resource models per data center
+    rm_1 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    rm_2 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    rm_3 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    rm_4 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    rm_5 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    rm_6 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    rm_7 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    rm_8 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    # # attach individual resource models
+    # reg_E52680.register("homogeneous_rm_E52680_1", rm_E52680_1)
+    # reg_E52680.register("homogeneous_rm_E52680_2", rm_E52680_1)
+    # reg_E52650.register("homogeneous_rm_E52650_1", rm_E52650_1)
+    # reg_E52650.register("homogeneous_rm_E52650_2", rm_E52650_1)
+    # reg_E52650.register("homogeneous_rm_E52650_3", rm_E52650_1)
 
-    rm_E52650_1 = UpbSimpleCloudDcRM(MAX_CU_E52650, MAX_MU_E52650)
-    rm_E52650_2 = UpbSimpleCloudDcRM(MAX_CU_E52650, MAX_MU_E52650)
-    rm_E52650_3 = UpbSimpleCloudDcRM(MAX_CU_E52650, MAX_MU_E52650)
+    # add 8 servers
+    off_cloud_1 = net.addDatacenter('off-cloud1')  # place client/server VNFs
+    off_cloud_2 = net.addDatacenter('off-cloud2')  # place client/server VNFs
+    off_cloud_3 = net.addDatacenter('off-cloud3')  # place client/server VNFs
+    off_cloud_4 = net.addDatacenter('off-cloud4')  # place client/server VNFs
+    chain_server_1 = net.addDatacenter('chain-server1')
+    chain_server_2 = net.addDatacenter('chain-server2')
+    chain_server_3 = net.addDatacenter('chain-server3')
+    chain_server_4 = net.addDatacenter('chain-server4')
 
-    reg_E52680_1.register("homogeneous_rm_E52680_1", rm_E52680_1)
-    reg_E52680_2.register("homogeneous_rm_E52680_2", rm_E52680_2)
-
-    reg_E52650_1.register("homogeneous_rm_E52650_1", rm_E52650_1)
-    reg_E52650_2.register("homogeneous_rm_E52650_2", rm_E52650_2)
-    reg_E52650_3.register("homogeneous_rm_E52650_3", rm_E52650_3)
-
-    # add 5 servers
-    off_cloud = net.addDatacenter('off-cloud')  # place client/server VNFs
-    chain_server1 = net.addDatacenter('chain-server1')
-    chain_server2 = net.addDatacenter('chain-server2')
-    chain_server3 = net.addDatacenter('chain-server3')
-    chain_server4 = net.addDatacenter('chain-server4')
-
-    off_cloud.assignResourceModel(rm_E52680_1)
-    chain_server1.assignResourceModel(rm_E52650_1)
-    chain_server2.assignResourceModel(rm_E52680_2)
-    chain_server3.assignResourceModel(rm_E52650_2)
-    chain_server4.assignResourceModel(rm_E52650_3)
+    off_cloud_1.assignResourceModel(rm_1)
+    off_cloud_2.assignResourceModel(rm_2)
+    off_cloud_3.assignResourceModel(rm_3)
+    off_cloud_4.assignResourceModel(rm_4)
+    chain_server_1.assignResourceModel(rm_5)
+    chain_server_2.assignResourceModel(rm_6)
+    chain_server_3.assignResourceModel(rm_7)
+    chain_server_4.assignResourceModel(rm_8)
     # connect data centers with switches
     tor1 = net.addSwitch('tor1')
 
     # link data centers and switches
-    net.addLink(off_cloud, tor1)
-    net.addLink(chain_server1, tor1)
-    net.addLink(chain_server2, tor1)
-    net.addLink(chain_server3, tor1)
-    net.addLink(chain_server4, tor1)
+    net.addLink(off_cloud_1, tor1)
+    net.addLink(off_cloud_2, tor1)
+    net.addLink(off_cloud_3, tor1)
+    net.addLink(off_cloud_4, tor1)
+    net.addLink(chain_server_1, tor1)
+    net.addLink(chain_server_2, tor1)
+    net.addLink(chain_server_3, tor1)
+    net.addLink(chain_server_4, tor1)
 
     # create REST API endpoint
     api = RestApiEndpoint("0.0.0.0", 5001)
@@ -113,11 +123,14 @@ def prepareDC():
     api.connectDCNetwork(net)
 
     # connect data centers to the endpoint
-    api.connectDatacenter(off_cloud)
-    api.connectDatacenter(chain_server1)
-    api.connectDatacenter(chain_server2)
-    api.connectDatacenter(chain_server3)
-    api.connectDatacenter(chain_server4)
+    api.connectDatacenter(off_cloud_1)
+    api.connectDatacenter(off_cloud_2)
+    api.connectDatacenter(off_cloud_3)
+    api.connectDatacenter(off_cloud_4)
+    api.connectDatacenter(chain_server_1)
+    api.connectDatacenter(chain_server_2)
+    api.connectDatacenter(chain_server_3)
+    api.connectDatacenter(chain_server_4)
 
     # start API and containernet
     api.start()
@@ -151,7 +164,7 @@ def scaleOut():
     # create NAT VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     nat = cs1.startCompute("nat", image='knodir/nat',
-                           flavor_name=fl,
+                           flavor_name="nat",
                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
                                     {'id': 'output', 'ip': '10.0.1.4/24'}])
     nat.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:2')
@@ -161,7 +174,7 @@ def scaleOut():
     # 'output' interface for the 'ids' VNF. Both interfaces are bridged to
     # ovs1 bridge. knodir/sonata-fw-vnf has OVS and Ryu controller.
     fw = cs2.startCompute("fw", image='knodir/sonata-fw-vnf',
-                          flavor_name="xlarge",
+                          flavor_name="fw",
                           network=[{'id': 'input', 'ip': '10.0.1.5/24'},
                                    {'id': 'output-ids1', 'ip': '10.0.1.60/24'},
                                    # {'id': 'output-ids2', 'ip': '10.0.1.61/24'},
@@ -173,7 +186,7 @@ def scaleOut():
     # create ids VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
     ids1 = cs3.startCompute("ids1", image='knodir/snort-trusty',
-                            flavor_name=fl,
+                            flavor_name="ids",
                             network=[{'id': 'input', 'ip': '10.0.1.70/24'},
                                      {'id': 'output', 'ip': '10.0.1.80/24'}])
     # ids2 = cs1.startCompute("ids2", image='knodir/snort-xenial',
@@ -185,7 +198,7 @@ def scaleOut():
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     vpn = cs4.startCompute("vpn", image='knodir/vpn-client',
-                           flavor_name=fl,
+                           flavor_name="vpn",
                            network=[{'id': 'input-ids1', 'ip': '10.0.1.90/24'},
                                     # {'id': 'input-ids2', 'ip': '10.0.1.91/24'},
                                     {'id': 'input-fw', 'ip': '10.0.1.92/24'},
