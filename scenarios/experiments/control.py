@@ -119,6 +119,9 @@ def clean_and_save(cmds, testName):
 
 
 def set_bw():
+    os.system('ovs-vsctl -- set Port dc1.s1-eth1 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=2000000 queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=2000000 other-config:max-rate=20000000')
     os.system('ovs-vsctl -- set Port dc1.s1-eth2 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=2000000 queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=2000000 other-config:max-rate=20000000')
@@ -215,7 +218,9 @@ def scale_bw():
     # os.system('sudo docker exec -i mn.client /bin/bash -c "iperf3 -V -u -b 1G -c 10.0.10.10 -t 60" > test_c.log &')
     # # os.system('sudo docker exec -i mn.client2 /bin/bash -c "iperf3 -V -b 1G -c 10.0.10.10 -p 5202 -t 32" > test_c2.log &')
     # # os.system('sudo tcpdump -i dc1.s1-eth3 -l -e -n | ./netbps &')
-
+    os.system('ovs-vsctl -- set Port dc1.s1-eth1 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=3000000 queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=3000000 other-config:max-rate=30000000')
     os.system('ovs-vsctl -- set Port dc1.s1-eth2 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=3000000 queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=3000000 other-config:max-rate=30000000')
@@ -296,35 +301,42 @@ class RunBench(cmd.Cmd):
         # list of commands to execute one-by-one
         cmds = []
         # clean stale programs and remove old files
+        cmds.append('sudo rm ./results/scaleout-from-client.csv')
+        cmds.append('sudo rm ./results/scaleout-from-ids1.csv')
+        cmds.append('sudo rm ./results/scaleout-from-vpn.csv')
 
         cmds = clean_stale(cmds)
 
+        # Set the initial bandwidth constraints of the system
+        set_bw()
+        sleep(3)
         # cmds.append('sudo docker exec -i mn.server /bin/bash -c "iperf3 -s --bind 10.8.0.1" &')
-        cmds.append('sudo docker exec -i mn.client /bin/bash -c "dstat --net --time -N intf1 --bits --output /tmp/dstat.csv" &')
-        cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "dstat --net --time -N input --bits --output /tmp/dstat.csv" &')
-        cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "dstat --net --time -N input-fw --bits --output /tmp/dstat.csv" &')
+        # cmds.append('sudo docker exec -i mn.client /bin/bash -c "dstat --net --time -N intf1 --bits --output /tmp/dstat.csv" &')
+        # cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "dstat --net --time -N input --bits --output /tmp/dstat.csv" &')
+        # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "dstat --net --time -N input-fw --bits --output /tmp/dstat.csv" &')
+        cmds.append('sudo timeout 70 dstat --net --time -N dc1.s1-eth1 --nocolor --output ./results/scaleout-from-client.csv &')
+        cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth7 --nocolor --output ./results/scaleout-from-ids1.csv &')
+        cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth4 --nocolor --output ./results/scaleout-from-vpn.csv &')
+
         # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
-        # cmds.append('sudo docker exec -i mn.client /bin/bash -c "tcpreplay --loop=100 --mbps=10 -d 1 --intf1=intf1 /ftp.ready.pcap" &')
+        cmds.append('sudo docker exec -i mn.client /bin/bash -c "tcpreplay --loop=100 --mbps=10 -d 1 --intf1=intf1 /ftp.ready.pcap" &')
         # each loop is around 40s for 10 Mbps speed, 2 loops easily make 1m
-        cmds.append('sudo docker exec -i mn.client /bin/bash -c "tcpreplay --loop=2 --mbps=10 -d 1 --intf1=intf1 /output.pcap"')
+        cmds.append('sudo docker exec -i mn.client /bin/bash -c "tcpreplay --loop=2 --mbps=10 -d 1 --intf1=intf1 /output.pcap" &')
 
         for cmd in cmds:
             execStatus = subprocess.call(cmd, shell=True)
             print('returned %d from %s (0 is success)' % (execStatus, cmd))
         cmds[:] = []
-
-        print('wait 3s for iperf server and other processes initialize')
-        thread.start_new_thread(set_bw, ())
-        sleep(3)
+        print("Generating traffic for 30 seconds")
 
         # start scaling up the bandwidth after 30 seconds
         sleep(30)
         print("Scaling up bandwidth by factor of 1")
-        thread.start_new_thread(scale_bw, ())
-
+        scale_bw()
+        sleep(40)
         # clean and save the results in csv file named after the test
-        cmds = clean_and_save(cmds, "scaleout")
-
+        # cmds = clean_and_save(cmds, "scaleout")
+        cmds.append('sudo killall dstat')
         print('done')
 
     def do_upgrade(self, line):
