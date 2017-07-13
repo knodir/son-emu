@@ -151,10 +151,10 @@ def get_placement(pn_fname, vn_fname):
     with open(out_fname) as data_file:
         allocs = json.load(data_file)
 
-    # data is in following format
+    # "allocs" has the following format
     # {'allocation_0':
     #   {'assignment': [['fw', 'chain-server1'],
-    #                   ['ids', 'chain-server1']},
+    #                   ['ids', 'chain-server1']],
     #   {'bandwidth': []},
     # 'allocation_1': ...}
     # }
@@ -162,67 +162,115 @@ def get_placement(pn_fname, vn_fname):
 
 
 def allocate_chains(dcs, allocs):
-    """ Implements node-upgrade scenario. TBD. """
+    """ Create chains. """
 
     cmds = []
     fl = "large"
+    chain_index = 0
+    # vnfs holds array of each VNF type
+    vnfs = {'source': [], 'nat': [], 'fw': [], 'ids': [], 'vpn': [], 'sink': []}
 
-    # create client with one interface
-    client = off_cloud.startCompute("client", image='knodir/client',
-            flavor_name=fl,
-            network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
-    # create NAT VNF with two interfaces. Its 'input'
-    # interface faces the client and output interface the server VNF.
-    nat = cs1.startCompute("nat", image='knodir/nat',
-            flavor_name=fl,
-            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
-                {'id': 'output', 'ip': '10.0.1.4/24'}])
-    # create fw VNF with two interfaces. 'input' interface for 'client' and
-    # 'output' interface for the 'ids' VNF. Both interfaces are bridged to
-    # ovs1 bridge. knodir/sonata-fw-vnf has OVS and Ryu controller.
-    fw = cs1.startCompute("fw", image='knodir/sonata-fw-vnf',
-            flavor_name="xlarge",
-            network=[{'id': 'input', 'ip': '10.0.1.5/24'},
-                {'id': 'output-ids1', 'ip': '10.0.1.60/24'},
-                {'id': 'output-ids2', 'ip': '10.0.1.61/24'},
-                {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
-    # create ids VNF with two interfaces. 'input' interface for 'fw' and
-    # 'output' interface for the 'server' VNF.
-    ids1 = cs1.startCompute("ids1", image='knodir/snort-trusty',
-            flavor_name=fl,
-            network=[{'id': 'input', 'ip': '10.0.1.70/24'},
-                {'id': 'output', 'ip': '10.0.1.80/24'}])
-    ids2 = cs1.startCompute("ids2", image='knodir/snort-xenial',
-            flavor_name=fl,
-            network=[{'id': 'input', 'ip': '10.0.1.71/24'},
-                {'id': 'output', 'ip': '10.0.1.81/24'}])
- 
-    # create VPN VNF with two interfaces. Its 'input'
-    # interface faces the client and output interface the server VNF.
-    vpn = cs1.startCompute("vpn", image='knodir/vpn-client',
-            flavor_name=fl,
-            network=[{'id': 'input-ids1', 'ip': '10.0.1.90/24'},
-                {'id': 'input-ids2', 'ip': '10.0.1.91/24'},
-                {'id': 'input-fw', 'ip': '10.0.1.92/24'},
-                {'id': 'output', 'ip': '10.0.10.2/24'}])
-    # create server VNF with one interface. Do not change assigned 10.0.10.10/24
-    # address of the server. It is the address VPN clients use to connect to the
-    # server and this address is hardcoded inside client.ovpn of the vpn-client
-    # Docker image. We also remove the injected routing table entry for this
-    # address. So, if you change this address make sure it is changed inside
-    # client.ovpn file as well as subprocess mn.vpn route injection call below.
-    server = off_cloud.startCompute("server", image='knodir/vpn-server',
-            flavor_name="small",
-            network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
+    # iterate over each allocation and create each chain
+    for alloc_name, chain_mapping in allocs.iteritems():
+        print('started allocating chain: %d' % chain_index)
 
-    #net.stop()
-    #return
+        # iterate over each chain and create chain VNFs
+        for vnf_mapping in chain_mapping['assignment']:
+            print('vnf_mapping = %s' % vnf_mapping)
+            vnf_name = vnf_mapping[0]
+            server_name = vnf_mapping[1]
+            vnf_prefix = 'chain%d' % chain_index
+            vnf_id = '%s-%s' % (vnf_prefix, vnf_name)
+            vnf_obj = None
+            print('creating %s on %s' % (vnf_id, server_name))
 
-    # execute /start.sh script inside firewall Docker image. It starts Ryu
+            if vnf_name == 'source':
+                # create client with one interface
+                vnf_obj = dcs[server_name].startCompute(vnf_id,
+                        image='knodir/client', flavor_name=fl,
+                        network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+                vnfs[vnf_name].append({vnf_id: vnf_obj})
+            
+            elif vnf_name == 'nat':
+                # create NAT VNF with two interfaces. Its 'input'
+                # interface faces the client and output interface the server VNF.
+                vnf_obj = dcs[server_name].startCompute(vnf_id,
+                        image='knodir/nat', flavor_name=fl,
+                        network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                            {'id': 'output', 'ip': '10.0.1.4/24'}])
+                vnfs[vnf_name].append({vnf_id: vnf_obj})
+
+            elif vnf_name == 'fw':
+                # create fw VNF with two interfaces. 'input' interface for 'client' and
+                # 'output' interface for the 'ids' VNF. Both interfaces are bridged to
+                # ovs1 bridge. knodir/sonata-fw-vnf has OVS and Ryu controller.
+                vnf_obj = dcs[server_name].startCompute(vnf_id,
+                        image='knodir/sonata-fw-vnf', flavor_name="xlarge",
+                        network=[{'id': 'input', 'ip': '10.0.1.5/24'},
+                            {'id': 'output-ids1', 'ip': '10.0.1.60/24'},
+                            {'id': 'output-ids2', 'ip': '10.0.1.61/24'},
+                            {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
+                vnfs[vnf_name].append({vnf_id: vnf_obj})
+
+            elif vnf_name == 'ids':
+                # create ids VNF with two interfaces. 'input' interface for 'fw' and
+                # 'output' interface for the 'server' VNF.
+                vnf_obj = dcs[server_name].startCompute(vnf_id,
+                        image='knodir/snort-trusty', flavor_name=fl,
+                        network=[{'id': 'input', 'ip': '10.0.1.70/24'},
+                            {'id': 'output', 'ip': '10.0.1.80/24'}])
+                vnfs[vnf_name].append({vnf_id: vnf_obj})
+
+            elif vnf_name == 'vpn':
+                # create VPN VNF with two interfaces. Its 'input'
+                # interface faces the client and output interface the server VNF.
+                vnf_obj = dcs[server_name].startCompute(vnf_id,
+                        image='knodir/vpn-client', flavor_name=fl,
+                        network=[{'id': 'input-ids1', 'ip': '10.0.1.90/24'},
+                            {'id': 'input-ids2', 'ip': '10.0.1.91/24'},
+                            {'id': 'input-fw', 'ip': '10.0.1.92/24'},
+                            {'id': 'output', 'ip': '10.0.10.2/24'}])
+                vnfs[vnf_name].append({vnf_id: vnf_obj})
+
+            elif vnf_name == 'sink':
+                # create server VNF with one interface. Do not change assigned 10.0.10.10/24
+                # address of the server. It is the address VPN clients use to connect to the
+                # server and this address is hardcoded inside client.ovpn of the vpn-client
+                # Docker image. We also remove the injected routing table entry for this
+                # address. So, if you change this address make sure it is changed inside
+                # client.ovpn file as well as subprocess mn.vpn route injection call below.
+                vnf_obj = dcs[server_name].startCompute(vnf_id,
+                        image='knodir/vpn-server', flavor_name=fl,
+                        network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
+                vnfs[vnf_name].append({vnf_id: vnf_obj})
+
+            else:
+                print('ERROR: unknown VNF type: %s' % vnf_name)
+                os.exit(1)
+
+            print('successfully created VNF: %s' % vnf_id)
+
+        print('successfully created chain: %d' % chain_index)
+        chain_index += 1
+
+    return vnfs
+
+
+def plumb_chains(vnfs):
+    # vnfs have the following format:
+    # {fw: [{chain0_fw: obj}, {chain1_fw: obj}, ...],
+    #  nat: [{chain0_nat: obj}, {chain1_nat: obj}, ...],
+    #  ...}
+
+    # execute /start.sh script inside all firewalls. It starts Ryu
     # controller and OVS with proper configuration.
-    cmd = 'sudo docker exec -i mn.fw /bin/bash /root/start.sh &'
-    execStatus = subprocess.call(cmd, shell=True)
-    print('returned %d from fw start.sh start (0 is success)' % execStatus)
+    for fw_name_and_obj in vnfs['fw']:
+        fw_name = fw_name_and_obj.keys()[0]
+        cmd = 'sudo docker exec -i mn.%s /bin/bash /root/start.sh &' % fw_name
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+    return
 
     print('> sleeping 10s to wait ryu controller initialize')
     time.sleep(10)
@@ -314,6 +362,7 @@ def allocate_chains(dcs, allocs):
     net.CLI()
     net.stop()
 
+#def send_traffic(vnfs):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
@@ -322,12 +371,14 @@ if __name__ == '__main__':
     pn_fname = "../topologies/e2-1rack-8servers.pn.json"
     vn_fname = "../topologies/e2-chain-4vnfs.vn.json"
 
-    net, api, dcs, tors = prepareDC(pn)
+    net, api, dcs, tors = prepareDC(pn_fname)
     allocs = get_placement(pn_fname, vn_fname)
 
-    # allocate_chains(dcs, allocs)
+    vnfs = allocate_chains(dcs, allocs)
 
-    #net.CLI()
-    #net.stop()
+    plumb_chains(vnfs)
+
+    net.CLI()
+    net.stop()
 
     cleanup()
