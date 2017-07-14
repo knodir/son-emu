@@ -157,6 +157,8 @@ def get_placement(pn_fname, vn_fname, algo):
             allocs = json.load(data_file)
         return allocs
 
+    # round-robin and depth-first allocations
+
     # Read physical network from file.
     with open(pn_fname) as data_file:
         pn = json.load(data_file)
@@ -184,11 +186,32 @@ def get_placement(pn_fname, vn_fname, algo):
     glog.info('off_cloud: %s', off_cloud)
     glog.info('chain_server: %s', chain_server)
 
+
+    # get bandwidth for each VNF. Note that we assume VN format (of input JSON
+    # file) is [vnf_source, vnf_destination, bandwidth_amount] and there is no
+    # duplicate for VNF src-dst pair. This is true since we handcraft chain JSON
+    # files (but something to be aware if JSON is auto-generated, where the VNF
+    # order might get mixed).
+    vnf_bws = {}
+    for vnf in vn['VN']:
+        vnf_name = vnf[0]
+        if vnf_name in vnf_bws.keys():
+            vnf_bws[vnf_name] += vnf[2]
+        else:
+            vnf_bws[vnf_name] = vnf[2]
+        last_vnf_name = vnf[1]
+    # following must be a 'sink' VNF, which does not appear as a 'source' VNF
+    # (as the first element) at all, but we need to add it as a VNF too.
+    vnf_bws[last_vnf_name] = vnf[2]
+
+    glog.info('vnf_bws: %s', vnf_bws)
+
     # candidate_servers contains list of server names which have enough capacity
     # [cpu, ram, bandwidth] to host this VNF.
     candidate_servers = []
     allocations = {}
     assignments, bandwidth = [], []
+    assignments_dict = {}
     chain_index = 0
     enough_resources = True
 
@@ -196,7 +219,9 @@ def get_placement(pn_fname, vn_fname, algo):
     # allocations are invalid and we ignore them (at the end of the loop).
     while enough_resources:
         for vnf_name in vn['VMs']:
-            
+            vnf_cpu = vn['VMs'][vnf_name][0] * vnf_bws[vnf_name]
+            vnf_ram = vn['VMs'][vnf_name][1] * vnf_bws[vnf_name]
+            vnf_bw = vn['VMs'][vnf_name][2] * vnf_bws[vnf_name]
             # iterate through each server and add it to the candidate_servers
             # list if it has enough resources to host this VNF. Then we select
             # one of these servers based on the algorithm. RoundRobin randomly
@@ -208,27 +233,29 @@ def get_placement(pn_fname, vn_fname, algo):
             if vnf_name == 'source' or vnf_name == 'sink':
                 # sname means 'server name'
                 for sname in off_cloud:
-                    if (pn['Servers'][sname][0]-vn['VMs'][vnf_name][0] >= 0) and (
-                            pn['Servers'][sname][1]-vn['VMs'][vnf_name][1] >= 0) and (
-                            pn['Servers'][sname][2]-vn['VMs'][vnf_name][2] >= 0):
-                        glog.info('%s has enough resources [%.4f, %.4f, %.4f]' +
-                                ' to host %s [%.4f, %.4f, %.4f]', 
-                            sname, pn['Servers'][sname][0],
-                            pn['Servers'][sname][1], pn['Servers'][sname][2],
-                            vnf_name, vn['VMs'][vnf_name][0],
-                            vn['VMs'][vnf_name][1], vn['VMs'][vnf_name][2])
+                    if (pn['Servers'][sname][0] - vnf_cpu >= 0) and (
+                            pn['Servers'][sname][1] - vnf_ram >= 0) and (
+                            pn['Servers'][sname][2] - vnf_bw >= 0):
+                        #glog.info('%s has enough resources [%.4f, %.4f, %.4f]'+
+                        glog.debug('%s has enough resources [%.4f, %.4f, %.4f]'+
+                                ' to host %s [%.4f, %.4f, %.4f]', sname,
+                                pn['Servers'][sname][0],
+                                pn['Servers'][sname][1],
+                                pn['Servers'][sname][2], vnf_name, vnf_cpu,
+                                vnf_ram, vnf_bw)
                         candidate_servers.append(sname)
             else: # this is a chain VNF
                 for sname in chain_server:
-                    if (pn['Servers'][sname][0]-vn['VMs'][vnf_name][0] >= 0) and (
-                            pn['Servers'][sname][1]-vn['VMs'][vnf_name][1] >= 0) and (
-                            pn['Servers'][sname][2]-vn['VMs'][vnf_name][2] >= 0):
-                        glog.info('%s has enough resources [%.4f, %.4f, %.4f]' +
-                                ' to host %s [%.4f, %.4f, %.4f]',
-                            sname, pn['Servers'][sname][0],
-                            pn['Servers'][sname][1], pn['Servers'][sname][2],
-                            vnf_name, vn['VMs'][vnf_name][0],
-                            vn['VMs'][vnf_name][1], vn['VMs'][vnf_name][2])
+                    if (pn['Servers'][sname][0] - vnf_cpu >= 0) and (
+                            pn['Servers'][sname][1] - vnf_ram >= 0) and (
+                            pn['Servers'][sname][2] - vnf_bw >= 0):
+                        #glog.info('%s has enough resources [%.4f, %.4f, %.4f]'+
+                        glog.debug('%s has enough resources [%.4f, %.4f, %.4f]'+
+                                ' to host %s [%.4f, %.4f, %.4f]', sname,
+                                pn['Servers'][sname][0],
+                                pn['Servers'][sname][1],
+                                pn['Servers'][sname][2], vnf_name, vnf_cpu,
+                                vnf_ram, vnf_bw)
                         candidate_servers.append(sname)
 
             if len(candidate_servers) == 0:
@@ -236,7 +263,7 @@ def get_placement(pn_fname, vn_fname, algo):
                 # partial chain allocation since chains have to be fully
                 # allocated to be a valid allocation.
                 glog.info('candidate_servers is empty. No more allocation is' +
-                    ' possible. Completed %d allocations.', (chain_index+1))
+                    ' possible. Completed %d allocations.', chain_index)
                 enough_resources = False
                 break
 
@@ -257,14 +284,42 @@ def get_placement(pn_fname, vn_fname, algo):
             # empty candidate_servers for the next iteration
             candidate_servers = []
             # decrease available resources from the chosen server
-            pn['Servers'][sname][0] -= vn['VMs'][vnf_name][0]
-            pn['Servers'][sname][1] -= vn['VMs'][vnf_name][1]
-            pn['Servers'][sname][2] -= vn['VMs'][vnf_name][2]
+            pn['Servers'][sname][0] -= vnf_cpu
+            pn['Servers'][sname][1] -= vnf_ram
+            pn['Servers'][sname][2] -= vnf_bw
+
+            # Note that we do not decrease link bandwidth on ToR switch because
+            # we know this is a single rack environment (all servers are
+            # connected to the same ToR switch). On a single rack topology,
+            # decrementing the server bandwidth suffice because ToR switch
+            # provides full bisection bandwidth. This will not be true for
+            # multi-rack topologies (watch out Sam) without full bisection
+            # bandwidth (ToR-to-OtherSwitch links can get saturated before
+            # server-to-ToR links).
 
             assignments.append([vnf_name, sname])
-            # glog.info('assignments = %s', assignments)
+            assignments_dict[vnf_name] = sname
+
+        glog.debug('assignments = %s', assignments)
+        glog.debug('assignments_dict = %s', assignments_dict)
         
         if enough_resources:
+            # do not deduct bandwidth from server-to-ToR link if the VNF pair
+            # is assigned to the same server. Since the code above already
+            # deducts the bandwidth we just increase the same amount back.
+            for pair in vn['VN']:
+                glog.debug('pair = %s', pair)
+                if ('source' in pair) or ('sink' in pair):
+                    # ignore source and sink VNFs since they are always placed
+                    # on different server than other VNFs.
+                    continue
+                if assignments_dict[pair[0]] == assignments_dict[pair[1]]:
+                    glog.debug('both %s are assigned to the same server %s',
+                            pair, assignments_dict[pair[0]])
+                    pn['Servers'][sname][2] += vn['VMs'][pair[0]][2] * vnf_bws[pair[0]]
+                    pn['Servers'][sname][2] += vn['VMs'][pair[1]][2] * vnf_bws[pair[1]]
+
+            # add this chain allocation to the list of allocations
             allocations['allocation_%d' % chain_index] = {
                     'assignment': assignments, 'bandwidth': bandwidth}
 
@@ -272,11 +327,7 @@ def get_placement(pn_fname, vn_fname, algo):
             # chain allocation
             chain_index += 1
             assignments = []
-
-        # watchdog to prevent infinite loop
-        if chain_index > 30: # some impossible number of allocations
-            glog.info('ERROR: chain_index = %d' % chain_index)
-            break
+            assignments_dict = {}
 
     # "allocs" has the following format
     # {'allocation_0':
@@ -505,17 +556,18 @@ if __name__ == '__main__':
         logger.handlers = logger.handlers[len(logger.handlers)-1:]
     print('logger handlers = %s' % logger.handlers)
 
-    pn_fname = "../topologies/e2-1rack-8servers.pn.json"
+    #pn_fname = "../topologies/e2-1rack-8servers.pn.json"
+    pn_fname = "../topologies/e2-1rack-48servers.pn.json"
     vn_fname = "../topologies/e2-chain-4vnfs.vn.json"
 
-    net, api, dcs, tors = prepareDC(pn_fname)
+    # net, api, dcs, tors = prepareDC(pn_fname)
     algos = ['netsolver', 'round-robin', 'depth-first']
-    # allocs = get_placement(pn_fname, vn_fname, algos[0]) # netsolver
-    # allocs = get_placement(pn_fname, vn_fname, algos[1]) # round-robin
-    allocs = get_placement(pn_fname, vn_fname, algos[2]) # depth-first
+    #allocs = get_placement(pn_fname, vn_fname, algos[0]) # netsolver
+    allocs = get_placement(pn_fname, vn_fname, algos[1]) # round-robin
+    #allocs = get_placement(pn_fname, vn_fname, algos[2]) # depth-first
 
-    glog.info('allocs: %s' % allocs)
-    # sys.exit(0)
+    glog.info('allocs: %s; len = %d', allocs, len(allocs))
+    sys.exit(0)
 
     # allocate chains by placing them on appropriate servers
     vnfs = allocate_chains(dcs, allocs)
