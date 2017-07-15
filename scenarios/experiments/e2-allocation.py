@@ -15,7 +15,7 @@ from mininet.node import RemoteController
 from mininet.clean import cleanup
 
 
-def prepareDC(pn_fname, max_cu, max_mu):
+def prepareDC(pn_fname, max_cu, max_mu, dc_max_cu, dc_max_mu):
     """ Prepares physical topology to place chains. """
 
     # We use Sonata data center construct to simulate physical servers (just
@@ -59,7 +59,7 @@ def prepareDC(pn_fname, max_cu, max_mu):
     # Sonata VM OOM killer starts killing random processes.
 
     net = DCNetwork(controller=RemoteController, monitor=True,
-                    dc_emulation_max_cpu=max_cu, dc_emulation_max_mem=max_mu,
+                    dc_emulation_max_cpu=dc_max_cu, dc_emulation_max_mem=dc_max_mu,
                     enable_learning=True)
 
     # Read physical topology from file.
@@ -719,7 +719,12 @@ if __name__ == '__main__':
     #pn_fname = "../topologies/e2-azure-1rack-48servers.pn.json"
 
     # allocate servers (Sonata DC construct) to place chains
-    net, api, dcs, tors = prepareDC(pn_fname, 8, 3584)
+    # e2-nss-1rack-8servers
+    net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
+    # e2-azure-1rack-24servers
+    # net, api, dcs, tors = prepareDC(pn_fname, 20, 17408, 512, 417792)
+    # e2-azure-1rack-48servers
+    # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 512, 417792)
 
     algos = ['netsolver', 'round-robin', 'depth-first']
     # allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
