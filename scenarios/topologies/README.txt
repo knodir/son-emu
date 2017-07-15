@@ -26,7 +26,7 @@ See example below for a single rack (tor0) with two servers (s0, s1).
 
 Virtual topology description
 
-Chain has "VMs" and "VN" fileds. Both of these names are from
+Chain has "VMs" and "VN" fields. Both of these names are from
 NetSolver VDC. We do not modify them for compatibility (no need to
 change NetSolver VDC for NFV).
 
@@ -57,3 +57,52 @@ The field name is
 		["nat", "sink", 1]
 	]
 }
+
+Netsolver Sonata Topologies:
+
+In Sonata, the minimum amount of space a network function can consume is 512 MB. CPU time is relative and can be adjusted freely.
+Our allocation model assumes that 0.125 CPU time is the lowest possible unit.
+We denote these values as our NetSolver compute basis of 1 and 1.
+All subsequent values are multiples of the 512 MB RAM and 0.125 CPU time
+According to these properties we model the base consumption for NetSolver as follows:
+
+IDS  0.500 CPU time, 2.0 Memory, 1 Gbps: 4 4 1
+NAT  0.125 CPU time, 0.5 Memory, 1 Gbps: 1 1 1
+FW   0.375 CPU time, 0.5 Memory, 1 Gbps: 3 1 1
+VPN  0.250 CPU time, 0.5 Memory, 1 Gbps: 2 1 1
+WC   0.250 CPU time, 1.5 Memory, 1 Gbps: 2 3 1
+LB   0.375 CPU time, 1.0 Memory, 1 Gbps: 3 1 1
+GW   0.250 CPU time, 0.5 Memory, 1 Gbps: 2 2 1
+RE   0.250 CPU time, 1.5 Memory, 1 Gbps: 2 3 1
+
+We currently have two machines available for testing:
+NSS: 8 cores, 32 GB memory
+Azure: 64 cores, 436 GB memory
+
+We emulate the following topologies:
+
+1-rack-8-servers on NSS:
+32 - 3.2 (10% memory buffer) = ~ 28 GB = 3.5*8
+One CPU core per machine
+1 machine:
+8 compute units
+3.5 GB Ram: 7 ram units
+
+1-rack-24-servers on Azure:
+436 - 21 (5% memory buffer) = ~ 414 GB = ~17*8
+64 cores / 24 = ~2.66 cores per machine = ~2.5*8 compute units
+1 machine:
+20 compute units
+17 GB Ram: 34 ram units
+
+1-rack-48-servers: Azure
+436 - 21 (5% memory buffer) = ~ 414 GB = ~8.5*48
+64 cores / 48 = ~1.33 cores per machine = ~1.25*8 compute units
+1 machine:
+10 compute units
+8.5 GB Ram: 17 ram units
+
+
+
+
+

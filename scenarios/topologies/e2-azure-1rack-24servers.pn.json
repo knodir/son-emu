@@ -1,0 +1,62 @@
+{
+    "clouds": {
+        "off-cloud0": [20, 34, 10],
+        "off-cloud1": [20, 34, 10],
+        "off-cloud2": [20, 34, 10],
+        "off-cloud3": [20, 34, 10],
+        "off-cloud3": [20, 34, 10],
+        "off-cloud4": [20, 34, 10],
+        "off-cloud5": [20, 34, 10],
+        "off-cloud6": [20, 34, 10],
+        "off-cloud7": [20, 34, 10],
+        "off-cloud8": [20, 34, 10],
+        "off-cloud9": [20, 34, 10],
+        "off-cloud10": [20, 34, 10],
+        "off-cloud11": [20, 34, 10],
+
+        "chain-server0": [20, 34, 10],
+        "chain-server1": [20, 34, 10],
+        "chain-server2": [20, 34, 10],
+        "chain-server3": [20, 34, 10],
+        "chain-server3": [20, 34, 10],
+        "chain-server4": [20, 34, 10],
+        "chain-server5": [20, 34, 10],
+        "chain-server6": [20, 34, 10],
+        "chain-server7": [20, 34, 10],
+        "chain-server8": [20, 34, 10],
+        "chain-server9": [20, 34, 10],
+        "chain-server10": [20, 34, 10],
+        "chain-server11": [20, 34, 10]
+
+    },
+    "PN": [
+        ["off-cloud0", "tor0", 10],
+        ["off-cloud1", "tor0", 10],
+        ["off-cloud2", "tor0", 10],
+        ["off-cloud3", "tor0", 10],
+        ["off-cloud4", "tor0", 10],
+        ["off-cloud5", "tor0", 10],
+        ["off-cloud6", "tor0", 10],
+        ["off-cloud7", "tor0", 10],
+        ["off-cloud8", "tor0", 10],
+        ["off-cloud9", "tor0", 10],
+        ["off-cloud10", "tor0", 10],
+        ["off-cloud11", "tor0", 10],
+        ["off-cloud12", "tor0", 10],
+
+
+        ["chain-server0", "tor0", 10],
+        ["chain-server1", "tor0", 10],
+        ["chain-server2", "tor0", 10],
+        ["chain-server3", "tor0", 10],
+        ["chain-server4", "tor0", 10],
+        ["chain-server5", "tor0", 10],
+        ["chain-server6", "tor0", 10],
+        ["chain-server7", "tor0", 10],
+        ["chain-server8", "tor0", 10],
+        ["chain-server9", "tor0", 10],
+        ["chain-server10", "tor0", 10],
+        ["chain-server11", "tor0", 10]
+
+    ]
+}
