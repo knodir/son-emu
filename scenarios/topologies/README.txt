@@ -60,19 +60,21 @@ The field name is
 
 Netsolver Sonata Topologies:
 
-In Sonata, the minimum amount of space a network function can consume is 512 MB. CPU time is relative and can be adjusted freely.
+In Sonata, the minimum amount of space a network function can consume
+is 512 MB. CPU time is relative and can be adjusted freely.
 Our allocation model assumes that 0.125 CPU time is the lowest possible unit.
-We denote these values as our NetSolver compute basis of 1 and 1.
-All subsequent values are multiples of the 512 MB RAM and 0.125 CPU time
+We denote these values as our NetSolver compute basis of 1 (for 512 MB
+ram) and 1 (for 0.125 core).
+All subsequent values are multiples of the 512 MB RAM and 0.125 CPU time.
 According to these properties we model the base consumption for NetSolver as follows:
 
 IDS  0.500 CPU time, 2.0 Memory, 1 Gbps: 4 4 1
-NAT  0.125 CPU time, 0.5 Memory, 1 Gbps: 1 1 1
-FW   0.375 CPU time, 0.5 Memory, 1 Gbps: 3 1 1
-VPN  0.250 CPU time, 0.5 Memory, 1 Gbps: 2 1 1
-WC   0.250 CPU time, 1.5 Memory, 1 Gbps: 2 3 1
-LB   0.375 CPU time, 1.0 Memory, 1 Gbps: 3 1 1
-GW   0.250 CPU time, 0.5 Memory, 1 Gbps: 2 2 1
+NAT  0.250 CPU time, 1.0 Memory, 1 Gbps: 2 2 1
+FW   0.375 CPU time, 1.0 Memory, 1 Gbps: 3 2 1
+VPN  0.250 CPU time, 1.0 Memory, 1 Gbps: 2 2 1
+WC   0.250 CPU time, 1.0 Memory, 1 Gbps: 2 3 1
+LB   0.375 CPU time, 1.0 Memory, 1 Gbps: 3 2 1
+GW   0.250 CPU time, 1.0 Memory, 1 Gbps: 2 2 1
 RE   0.250 CPU time, 1.5 Memory, 1 Gbps: 2 3 1
 
 We currently have two machines available for testing:
@@ -101,8 +103,4 @@ One CPU core per machine
 1 machine:
 10 compute units
 8.5 GB Ram: 17 ram units
-
-
-
-
 
