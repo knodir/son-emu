@@ -54,7 +54,7 @@ def prepareDC(pn_fname, max_cu, max_mu, dc_max_cu, dc_max_mu):
     # Note that all these container VNFs need at least 500 MB of memory to be
     # able to work. Firewall in particular, runs OVS, needs more than 1 GB to be
     # able to process packets. If you do not allocate sufficient CPU, system
-    # behaves bad. In most cases all physical cores gets pinned (probably
+    # behaves badly. In most cases all physical cores gets pinned (probably
     # because of the contention between OVS and cgroup mem limitation) and
     # Sonata VM OOM killer starts killing random processes.
 
@@ -122,132 +122,6 @@ def prepareDC(pn_fname, max_cu, max_mu, dc_max_cu, dc_max_mu):
     net.start()
 
     return (net, api, dcs, tors)
-
-# def prepareDC():
-#     """ Prepares physical topology to place chains. """
-
-#     # We use Sonata data center construct to simulate physical servers (just
-#     # servers hereafter). The reason is that Sonata DC has CPU/RAM resource
-#     # constraints just like the servers. We also model the links between servers
-#     # with bandwidth constraints of Sonata switch-to-DC link.
-
-#     # The topology we create below is one rack with two servers. The rack has
-#     # ToR switches (Sonata switch called "tor1"), to place chain VNFs.
-
-#     # Similar to the paper story of middlebox-as-a-server, we will put client
-#     # and server (traffic source and sink) outside the DC.
-
-#     # Here is the reason why we do not use Sonata "host" to model the servers.
-#     # Sonata uses Mininet host construct as-is. Mininet "host" supports only CPU
-#     # resource constraint. Therefore, we do not use Sonata "host" construct.
-
-#     # Unless otherwise specified, we always use "server" for variables and
-#     # description instead of "DC". This should avoid confusion with terminology.
-
-#     # add resource model (rm) to limit cpu/ram available in each server. We
-#     # create one resource mode and use it for all servers, meaning all of our
-#     # servers are homogeneous. Create multiple RMs for heterogeneous servers
-#     # (with different amount of cpu,ram).
-#     MAX_CU = 8  # max compute units
-#     MAX_MU = 3500  # max compute units
-
-#     # the cpu, ram resource above are consumed by VNFs with one of these
-#     # flavors. For some reason memory allocated for tiny flavor is 42 MB,
-#     # instead of 32 MB in this systems. Other flavors are multipliers of this
-#     # 42 MB (as expected).
-#     # "tiny",  {"compute": 0.5, "memory": 32, "disk": 1}
-#     # "small",  {"compute": 1.0, "memory": 128, "disk": 20}
-#     # "medium",  {"compute": 4.0, "memory": 256, "disk": 40}
-#     # "large",  {"compute": 8.0, "memory": 512, "disk": 80}
-#     # "xlarge",  {"compute": 16.0, "memory": 1024, "disk": 160}
-#     #
-#     # Note that all these container VNFs need at least 500 MB of memory to be
-#     # able to work. Firewall in particular, runs OVS, needs more than 1 GB to be
-#     # able to process packets. If you do not allocate sufficient CPU, system
-#     # behaves bad. In most cases all physical cores gets pinned (probably
-#     # because of the contention between OVS and cgroup mem limitation) and
-#     # Sonata VM OOM killer starts killing random processes.
-
-#     net = DCNetwork(controller=RemoteController, monitor=True,
-#                     dc_emulation_max_cpu=64, dc_emulation_max_mem=28000,
-#                     enable_learning=True)
-
-#     # create registrars
-#     # reg_E52680 = ResourceModelRegistrar(MAX_CU_E52680, MAX_MU_E52680)
-#     # reg_E52680_2 = ResourceModelRegistrar(MAX_CU_E52680, MAX_MU_E52680)
-#     # reg_E52650 = ResourceModelRegistrar(MAX_CU_E52650, MAX_MU_E52650)
-#     # reg_E52650_2 = ResourceModelRegistrar(MAX_CU_E52650, MAX_MU_E52650)
-#     # reg_E52650_3 = ResourceModelRegistrar(MAX_CU_E52650, MAX_MU_E52650)
-
-#     # create data center resource models per data center
-#     rm_1 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
-#     rm_2 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
-#     rm_3 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
-#     rm_4 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
-#     rm_5 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
-#     rm_6 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
-#     rm_7 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
-#     rm_8 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
-#     # # attach individual resource models
-#     # reg_E52680.register("homogeneous_rm_E52680_1", rm_E52680_1)
-#     # reg_E52680.register("homogeneous_rm_E52680_2", rm_E52680_1)
-#     # reg_E52650.register("homogeneous_rm_E52650_1", rm_E52650_1)
-#     # reg_E52650.register("homogeneous_rm_E52650_2", rm_E52650_1)
-#     # reg_E52650.register("homogeneous_rm_E52650_3", rm_E52650_1)
-
-#     # add 8 servers
-#     off_cloud_1 = net.addDatacenter('off-cloud1')  # place client/server VNFs
-#     off_cloud_2 = net.addDatacenter('off-cloud2')  # place client/server VNFs
-#     off_cloud_3 = net.addDatacenter('off-cloud3')  # place client/server VNFs
-#     off_cloud_4 = net.addDatacenter('off-cloud4')  # place client/server VNFs
-#     chain_server_1 = net.addDatacenter('chain-server1')
-#     chain_server_2 = net.addDatacenter('chain-server2')
-#     chain_server_3 = net.addDatacenter('chain-server3')
-#     chain_server_4 = net.addDatacenter('chain-server4')
-
-#     off_cloud_1.assignResourceModel(rm_1)
-#     off_cloud_2.assignResourceModel(rm_2)
-#     off_cloud_3.assignResourceModel(rm_3)
-#     off_cloud_4.assignResourceModel(rm_4)
-#     chain_server_1.assignResourceModel(rm_5)
-#     chain_server_2.assignResourceModel(rm_6)
-#     chain_server_3.assignResourceModel(rm_7)
-#     chain_server_4.assignResourceModel(rm_8)
-#     # connect data centers with switches
-#     tor1 = net.addSwitch('tor1')
-
-#     # link data centers and switches
-#     net.addLink(off_cloud_1, tor1)
-#     net.addLink(off_cloud_2, tor1)
-#     net.addLink(off_cloud_3, tor1)
-#     net.addLink(off_cloud_4, tor1)
-#     net.addLink(chain_server_1, tor1)
-#     net.addLink(chain_server_2, tor1)
-#     net.addLink(chain_server_3, tor1)
-#     net.addLink(chain_server_4, tor1)
-
-#     # create REST API endpoint
-#     api = RestApiEndpoint("0.0.0.0", 5001)
-
-#     # connect API endpoint to containernet
-#     api.connectDCNetwork(net)
-
-#     # connect data centers to the endpoint
-#     api.connectDatacenter(off_cloud_1)
-#     api.connectDatacenter(off_cloud_2)
-#     api.connectDatacenter(off_cloud_3)
-#     api.connectDatacenter(off_cloud_4)
-#     api.connectDatacenter(chain_server_1)
-#     api.connectDatacenter(chain_server_2)
-#     api.connectDatacenter(chain_server_3)
-#     api.connectDatacenter(chain_server_4)
-
-#     # start API and containernet
-#     api.start()
-#     net.start()
-
-#     return (net, api, [off_cloud_1, off_cloud_2, off_cloud_3, off_cloud_4, chain_server_1, chain_server_2, chain_server_3, chain_server_4])
-#     # return (net, dc, api)
 
 
 def get_placement(pn_fname, vn_fname, algo):
@@ -684,21 +558,16 @@ def plumb_chains(vnfs, num_of_chains):
         glog.info('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
-    source_vnfs, sink_vnfs = [], []
-    for vnf_name_and_obj in vnfs['source']:
-        vnf_name = vnf_name_and_obj.keys()[0]
-        source_vnfs.append(vnf_name)
-
-    for vnf_name_and_obj in vnfs['sink']:
-        vnf_name = vnf_name_and_obj.keys()[0]
-        sink_vnfs.append(vnf_name)
-
-    glog.info('source_vnf = %s, sink_vnfs = %s', source_vnfs, sink_vnfs)
-
     for chain_index in range(num_of_chains):
-        glog.info('ping %s -> %s. Packet drop %s%%', source_vnfs[chain_index],
-                  sink_vnfs[chain_index], net.ping([source_vnfs[chain_index],
-                                                    sink_vnfs[chain_index]], timeout=5))
+        src_vnf_name = vnfs['source'][chain_index].keys()[0]
+        dst_vnf_name = vnfs['sink'][chain_index].keys()[0]
+        src_vnf_obj = vnfs['source'][chain_index][src_vnf_name]
+        dst_vnf_obj = vnfs['sink'][chain_index][dst_vnf_name]
+
+        ping_res = net.ping([src_vnf_obj, dst_vnf_obj], timeout=5)
+
+        glog.info('ping %s -> %s. Packet drop %s%%',
+                src_vnf_name, dst_vnf_name, ping_res)
 
 
 if __name__ == '__main__':
@@ -736,6 +605,9 @@ if __name__ == '__main__':
 
     # allocate chains by placing them on appropriate servers
     vnfs = allocate_chains(dcs, allocs)
+
+    #net.CLI()
+    #net.stop()
 
     # configure the datapath on chains to push packets through them
     plumb_chains(vnfs, len(allocs))
