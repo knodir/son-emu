@@ -148,7 +148,7 @@ def get_placement(pn_fname, vn_fname, algo):
             allocs = json.load(data_file)
         return allocs
 
-    # all following code is for round-robin and depth-first allocations
+    # all following code is for random and packing allocations
 
     # Read physical network from file.
     with open(pn_fname) as data_file:
@@ -257,10 +257,10 @@ def get_placement(pn_fname, vn_fname, algo):
                 enough_resources = False
                 break
 
-            if algo == 'round-robin':
+            if algo == 'random':
                 # randomly choose a server from the candidate list
                 sname = random.choice(candidate_servers)
-            elif algo == 'depth-first':
+            elif algo == 'packing':
                 # always choose the first server on the list. Note that Python
                 # retains an order items appended to the list. Because
                 # 'off_cloud' and 'chain_server' lists are constant, and we
@@ -268,7 +268,7 @@ def get_placement(pn_fname, vn_fname, algo):
                 # 'candidate_servers' in the same order, choosing the first
                 # server on the list always going to be the same server (as long
                 # as it has enough resources to host the VNF). This is exactly
-                # how depth-first algorithm operates.
+                # how packing algorithm operates.
                 sname = candidate_servers[0]
 
             # empty candidate_servers for the next iteration
@@ -582,23 +582,30 @@ if __name__ == '__main__':
         logger.handlers = logger.handlers[len(logger.handlers) - 1:]
     print('logger handlers = %s' % logger.handlers)
 
-    vn_fname = "../topologies/e2-chain-4vnfs.vn.json"
+    #vn_fname = "../topologies/e2-chain-4vnfs.vn.json"
+    # pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
+
+    vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
+
     #pn_fname = "../topologies/e2-azure-1rack-24servers.pn.json"
     #pn_fname = "../topologies/e2-azure-1rack-48servers.pn.json"
 
     # allocate servers (Sonata DC construct) to place chains
     # e2-nss-1rack-8servers
     net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
+
     # e2-azure-1rack-24servers
     # net, api, dcs, tors = prepareDC(pn_fname, 20, 17408, 512, 417792)
-    # e2-azure-1rack-48servers
+
+    # e2-azure-1rack-48servers (or 50 servers)
     # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 512, 417792)
 
-    algos = ['netsolver', 'round-robin', 'depth-first']
+    # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
+    algos = ['netsolver', 'random', 'packing']
     # allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
-    # allocs = get_placement(pn_fname, vn_fname, algos[1])  # round-robin
-    allocs = get_placement(pn_fname, vn_fname, algos[2])  # depth-first
+    # allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
+    allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
 
     glog.info('allocs: %s; len = %d', allocs, len(allocs))
     # sys.exit(0)
