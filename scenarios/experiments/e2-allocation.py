@@ -525,25 +525,24 @@ def plumb_chains(vnfs, num_of_chains):
         glog.info('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
-    glog.info('> sleeping 60s to VPN client initialize...')
-    time.sleep(60)
-    glog.info('< wait complete')
+    glog.info('> sleeping 180s to let VPN client initialize...')
+    time.sleep(180)
+    glog.info('< 180s wait complete')
     glog.info('VPN client VNF started')
 
-    for vnf_name_and_obj in vnfs['sink']:
+    for vnf_name_and_obj in vnfs['nat']:
         vnf_name = vnf_name_and_obj.keys()[0]
         # rewrite NAT VNF MAC addresses for tcpreplay
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ifconfig input hw ether 00:00:00:00:00:02"' % vnf_name)
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.10.0/24 dev output"' % vnf_name)
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ip route add 10.8.0.0/24 dev output"' % vnf_name)
 
-    for vnf_name_and_obj in vnfs['sink']:
+    for vnf_name_and_obj in vnfs['vpn']:
         vnf_name = vnf_name_and_obj.keys()[0]
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids"' % vnf_name)
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ip route del 10.0.10.10/32"' % vnf_name)
-        #cmds.append('sudo docker exec -i mn.server /bin/bash -c "route add -net 10.0.0.0/24 dev intf2"')
 
-    for vnf_name_and_obj in vnfs['sink']:
+    for vnf_name_and_obj in vnfs['source']:
         vnf_name = vnf_name_and_obj.keys()[0]
         # rewrite client VNF MAC addresses for tcpreplay
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ifconfig intf1 hw ether 00:00:00:00:00:01"' % vnf_name)
