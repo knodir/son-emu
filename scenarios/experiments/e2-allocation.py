@@ -80,21 +80,33 @@ def prepareDC(pn_fname, max_cu, max_mu, dc_max_cu, dc_max_mu):
         dc_obj.assignResourceModel(rms[dc_name])
         glog.info('assigned resource model %s to %s', id(rms[dc_name]), dc_name)
 
-    # Extract ToR switch names. Thyse are the ones not listed as 'Servers'
     glog.info('PN read from JSON file %s' % data['PN'])
 
     tors = {}
 
+    # Extract ToR switch names. ToR are the ones not listed as 'Servers'. Note
+    # that this code is generic for multi-rack topology, which can have fields
+    # like
+    # ['server-name', 'tor-name', bw], ['tor-name', 'aggr-sw-name', bw],
+    # ['aggr-sw-name', 'gw-sw-name', bw] ...
+    # From this example, we need to include 'tor-name', 'aggr-sw-name', and
+    # 'gw-sw-name' to tors list.
+    # iterate through each PN item and assign None object to the tor. Later,
+    # None will be replaced with the ToR object (see net.addSwitch() below).
     for pn_item in data['PN']:
+        # check if this item is not 'Server' and also is not already included to
+        # tors list.
         if (pn_item[0] not in data['Servers'].keys()) and (
                 pn_item[0] not in tors.keys()):
             # glog.info(pn_item[0])
             tors[pn_item[0]] = None
 
+        # same comment as above, but for the second item
         if (pn_item[1] not in data['Servers'].keys()) and (
                 pn_item[1] not in tors.keys()):
             # glog.info(pn_item[1])
             tors[pn_item[1]] = None
+
 
     # connect ToR switches and DC per PN topology
     for tor_name in tors.keys():
@@ -116,10 +128,6 @@ def prepareDC(pn_fname, max_cu, max_mu, dc_max_cu, dc_max_mu):
     # connect data centers to the endpoint
     for dc_name, dc_obj in dcs.iteritems():
         api.connectDatacenter(dc_obj)
-
-    # start API and containernet
-    api.start()
-    net.start()
 
     return (net, api, dcs, tors)
 
@@ -374,14 +382,18 @@ def allocate_chains(dcs, allocs):
                 vnfs[vnf_name].append({vnf_id: vnf_obj})
 
             elif vnf_name == 'fw':
-                # create fw VNF with two interfaces. 'input' interface for 'client' and
-                # 'output' interface for the 'ids' VNF. Both interfaces are bridged to
-                # ovs1 bridge. knodir/sonata-fw-vnf has OVS and Ryu controller.
+                # create fw VNF with three interfaces. 'input' interface for
+                # 'nat', 'output-ids' interface for 'ids' VNF, and 'output-vpn'
+                # for VPN VNF. All three interfaces are bridged to ovs1 bridge.
+                # knodir/sonata-fw-vnf:alloc image  has OVS and Ryu controller,
+                # and is specifically designed for e2-allocations experiment.
+                # node-upgrade experiment requires knodir/sonata-fw-vnf:upgrade
+                # image as it has an additional interface for ids2.
                 vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                        image='knodir/sonata-fw-vnf', flavor_name="fw",
-                                                        network=[{'id': 'input', 'ip': '10.0.1.5/24'},
-                                                                 {'id': 'output-ids', 'ip': '10.0.1.61/24'},
-                                                                 {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
+                        image='knodir/sonata-fw-vnf:alloc', flavor_name="fw",
+                        network=[{'id': 'input', 'ip': '10.0.1.5/24'},
+                            {'id': 'output-ids', 'ip': '10.0.1.61/24'},
+                            {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
                 vnfs[vnf_name].append({vnf_id: vnf_obj})
 
             elif vnf_name == 'ids':
@@ -427,7 +439,7 @@ def allocate_chains(dcs, allocs):
     return vnfs
 
 
-def plumb_chains(vnfs, num_of_chains):
+def plumb_chains(net, vnfs, num_of_chains):
     # vnfs have the following format:
     # {fw: [{chain0_fw: obj}, {chain1_fw: obj}, ...],
     #  nat: [{chain0_nat: obj}, {chain1_nat: obj}, ...],
@@ -441,10 +453,10 @@ def plumb_chains(vnfs, num_of_chains):
         execStatus = subprocess.call(cmd, shell=True)
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
 
-    glog.info('> sleeping 10s to let ryu controller initialize properly')
-    time.sleep(10)
-    glog.info('< wait complete')
-    glog.info('fw start done')
+    #glog.info('> sleeping 10s to let ryu controller initialize properly')
+    #time.sleep(10)
+    #glog.info('< wait complete')
+    #glog.info('fw start done')
 
     # execute /start.sh script inside ids image. It bridges input and output
     # interfaces with br0, and starts ids process listering on br0.
@@ -462,43 +474,48 @@ def plumb_chains(vnfs, num_of_chains):
         execStatus = subprocess.call(cmd, shell=True)
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
 
+    glog.info('> sleeping 300s to let fw, ids, nat initialize properly...')
+    time.sleep(300)
+    glog.info('< 300s wait complete')
+    glog.info('start VNF chaining')
+
     # chain 'client <-> nat <-> fw <-> ids <-> vpn <-> server'
     for chain_index in range(num_of_chains):
         pair_src_name = vnfs['source'][chain_index].keys()[0]
         pair_dst_name = vnfs['nat'][chain_index].keys()[0]
-        net.setChain(pair_src_name, pair_dst_name, 'intf1', 'input',
+        res = net.setChain(pair_src_name, pair_dst_name, 'intf1', 'input',
                      bidirectional=True, cmd='add-flow')
-        glog.info('successfully chained %s and %s', pair_src_name, pair_dst_name)
+        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
         pair_src_name = vnfs['nat'][chain_index].keys()[0]
         pair_dst_name = vnfs['fw'][chain_index].keys()[0]
-        net.setChain(pair_src_name, pair_dst_name, 'output', 'input',
+        res = net.setChain(pair_src_name, pair_dst_name, 'output', 'input',
                      bidirectional=True, cmd='add-flow')
-        glog.info('successfully chained %s and %s', pair_src_name, pair_dst_name)
+        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
         pair_src_name = vnfs['fw'][chain_index].keys()[0]
         pair_dst_name = vnfs['ids'][chain_index].keys()[0]
-        net.setChain(pair_src_name, pair_dst_name, 'output-ids', 'input',
+        res = net.setChain(pair_src_name, pair_dst_name, 'output-ids', 'input',
                      bidirectional=True, cmd='add-flow')
-        glog.info('successfully chained %s and %s', pair_src_name, pair_dst_name)
+        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
         pair_src_name = vnfs['fw'][chain_index].keys()[0]
         pair_dst_name = vnfs['vpn'][chain_index].keys()[0]
-        net.setChain(pair_src_name, pair_dst_name, 'output-vpn', 'input-fw',
+        res = net.setChain(pair_src_name, pair_dst_name, 'output-vpn', 'input-fw',
                      bidirectional=True, cmd='add-flow')
-        glog.info('successfully chained %s and %s', pair_src_name, pair_dst_name)
+        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
         pair_src_name = vnfs['ids'][chain_index].keys()[0]
         pair_dst_name = vnfs['vpn'][chain_index].keys()[0]
-        net.setChain(pair_src_name, pair_dst_name, 'output', 'input-ids',
+        res = net.setChain(pair_src_name, pair_dst_name, 'output', 'input-ids',
                      bidirectional=True, cmd='add-flow')
-        glog.info('successfully chained %s and %s', pair_src_name, pair_dst_name)
+        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
         pair_src_name = vnfs['vpn'][chain_index].keys()[0]
         pair_dst_name = vnfs['sink'][chain_index].keys()[0]
-        net.setChain(pair_src_name, pair_dst_name, 'output', 'intf2',
+        res = net.setChain(pair_src_name, pair_dst_name, 'output', 'intf2',
                      bidirectional=True, cmd='add-flow')
-        glog.info('successfully chained %s and %s', pair_src_name, pair_dst_name)
+        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
     cmds = []
 
@@ -570,22 +587,12 @@ def plumb_chains(vnfs, num_of_chains):
 
 
 if __name__ == '__main__':
-    logger = logging.getLogger()
-    print('logger handlers = %s' % logger.handlers)
-    if len(logger.handlers) > 1:
-        # when glog is included, system will just adds it as an additional log
-        # handler resulting into each message being printed twice (which is bad).
-        # We drop all handlers except the last one, assuming the last one is
-        # glog (which seems always to be true). Comment out these lines if you
-        # see different behaviour
-        logger.handlers = logger.handlers[len(logger.handlers) - 1:]
-    print('logger handlers = %s' % logger.handlers)
+    logging.basicConfig(level=logging.DEBUG)
 
-
-    # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
+    vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-nss-1rack-8servers
-    # pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
-    # net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
+    pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
+    net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
 
     # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-azure-1rack-24servers
@@ -598,10 +605,13 @@ if __name__ == '__main__':
     # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 512, 417792)
 
     # e2-azure-1rack-50servers
-    vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
-    pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
-    net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 512, 417792)
+    #vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
+    #pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
+    #net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 512, 417792)
 
+    # start API and containernet
+    api.start()
+    net.start()
 
     # allocate servers (Sonata DC construct) to place chains
     # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
@@ -611,16 +621,14 @@ if __name__ == '__main__':
     allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
 
     glog.info('allocs: %s; len = %d', allocs, len(allocs))
-    # sys.exit(0)
 
     # allocate chains by placing them on appropriate servers
     vnfs = allocate_chains(dcs, allocs)
 
-    #net.CLI()
-    #net.stop()
-
     # configure the datapath on chains to push packets through them
-    plumb_chains(vnfs, len(allocs))
+    plumb_chains(net, vnfs, len(allocs))
+    glog.info('successfully plumbed %d chains', len(allocs))
+    glog.info('Chain setup done. You should see the terminal now.')
 
     net.CLI()
     net.stop()
