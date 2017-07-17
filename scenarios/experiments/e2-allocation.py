@@ -581,25 +581,29 @@ if __name__ == '__main__':
         logger.handlers = logger.handlers[len(logger.handlers) - 1:]
     print('logger handlers = %s' % logger.handlers)
 
-    #vn_fname = "../topologies/e2-chain-4vnfs.vn.json"
-    # pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
 
-    vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
-    pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
-
-    #pn_fname = "../topologies/e2-azure-1rack-24servers.pn.json"
-    #pn_fname = "../topologies/e2-azure-1rack-48servers.pn.json"
-
-    # allocate servers (Sonata DC construct) to place chains
+    # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-nss-1rack-8servers
-    net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
+    # pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
+    # net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
 
+    # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-azure-1rack-24servers
+    # pn_fname = "../topologies/e2-azure-1rack-24servers.pn.json"
     # net, api, dcs, tors = prepareDC(pn_fname, 20, 17408, 512, 417792)
 
+    # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-azure-1rack-48servers (or 50 servers)
+    # pn_fname = "../topologies/e2-azure-1rack-48servers.pn.json"
     # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 512, 417792)
 
+    # e2-azure-1rack-50servers
+    vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
+    pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
+    net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 512, 417792)
+
+
+    # allocate servers (Sonata DC construct) to place chains
     # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
     algos = ['netsolver', 'random', 'packing']
     # allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
