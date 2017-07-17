@@ -1,0 +1,49 @@
+{
+	"VMs": {
+		"source": [1, 1, 1],
+		"nat": [2, 2, 1],
+		"fw": [3, 2, 1],
+		"ids": [4, 4, 1],
+		"vpn": [2, 2, 1],
+		"sink": [1, 1, 1]
+	},
+	"VN": [
+		["source", "nat", 2],
+		["nat", "fw", 2],
+		["fw", "ids", 1],
+		["fw", "vpn", 1],
+		["ids", "vpn", 1],
+		["vpn", "sink", 2]
+	],
+  "server_antiaffinity": [
+    ["source", "chain-server0"],
+    ["source", "chain-server1"],
+    ["source", "chain-server2"],
+    ["source", "chain-server3"],
+
+    ["sink", "chain-server0"],
+    ["sink", "chain-server1"],
+    ["sink", "chain-server2"],
+    ["sink", "chain-server3"],
+
+    ["nat", "off-cloud0"],
+    ["nat", "off-cloud1"],
+    ["nat", "off-cloud2"],
+    ["nat", "off-cloud3"],
+
+    ["fw", "off-cloud0"],
+    ["fw", "off-cloud1"],
+    ["fw", "off-cloud2"],
+    ["fw", "off-cloud3"],
+
+    ["ids", "off-cloud0"],
+    ["ids", "off-cloud1"],
+    ["ids", "off-cloud2"],
+    ["ids", "off-cloud3"],
+
+    ["vpn", "off-cloud0"],
+    ["vpn", "off-cloud1"],
+    ["vpn", "off-cloud2"],
+    ["vpn", "off-cloud3"]
+  ]
+}
