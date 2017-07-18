@@ -465,7 +465,7 @@ class RunBench(cmd.Cmd):
 
         # copy .csv results from VNF to the host
         for chain_index in range(num_of_chains):
-            cmds.append('sudo docker cp mn.chain%d-sink:/tmp/dstat.csv ./results/e2-allocate-from-chain%d-sink.csv' % (chain_index, chain_index)
+            cmds.append('sudo docker cp mn.chain%d-sink:/tmp/dstat.csv ./results/e2-allocate-from-chain%d-sink.csv' % (chain_index, chain_index))
 
         for cmd in cmds:
             execStatus = subprocess.call(cmd, shell=True)
