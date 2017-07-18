@@ -126,9 +126,9 @@ class BaseResourceModel(object):
             "xlarge", {"compute": 16.0, "memory": 1024, "disk": 160}))
 
         self.addFlavour(ResourceFlavor(
-            "source", {"compute": 0.125, "memory": 256, "disk": 20}))    # CPU: 1/8 Memory: 1/4
+            "source", {"compute": 0.25, "memory": 512, "disk": 20}))    # CPU: 1/4 Memory: 1/2
         self.addFlavour(ResourceFlavor(
-            "sink", {"compute": 0.125, "memory": 256, "disk": 20}))    # CPU: 1/8 Memory: 1/4
+            "sink", {"compute": 0.25, "memory": 512, "disk": 20}))    # CPU: 1/4 Memory: 1/2
         self.addFlavour(ResourceFlavor(
             "nat", {"compute": 0.25, "memory": 512, "disk": 20}))    # CPU: 1/4 Memory: 1/2
         self.addFlavour(ResourceFlavor(
