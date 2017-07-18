@@ -8,12 +8,12 @@
 		"sink": [1, 1, 1]
 	},
 	"VN": [
-		["source", "nat", 2],
-		["nat", "fw", 2],
+		["source", "nat", 1],
+		["nat", "fw", 1],
 		["fw", "ids", 1],
 		["fw", "vpn", 1],
 		["ids", "vpn", 1],
-		["vpn", "sink", 2]
+		["vpn", "sink", 1]
 	],
   "server_antiaffinity": [
     ["source", "chain-server0"],
