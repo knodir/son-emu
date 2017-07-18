@@ -15,8 +15,11 @@ from mininet.node import RemoteController
 from mininet.clean import cleanup
 
 
-def prepareDC(pn_fname, max_cu, max_mu, dc_max_cu, dc_max_mu):
+def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     """ Prepares physical topology to place chains. """
+
+    # TODO(nodir): explain compute and memory resource consumption models
+    # according to https://github.com/sonata-nfv/son-emu/issues/238
 
     # We use Sonata data center construct to simulate physical servers (just
     # servers hereafter). The reason is that Sonata DC has CPU/RAM resource
@@ -59,7 +62,8 @@ def prepareDC(pn_fname, max_cu, max_mu, dc_max_cu, dc_max_mu):
     # Sonata VM OOM killer starts killing random processes.
 
     net = DCNetwork(controller=RemoteController, monitor=True,
-                    dc_emulation_max_cpu=dc_max_cu, dc_emulation_max_mem=dc_max_mu,
+                    dc_emulation_max_cpu=max_cu_net,
+                    dc_emulation_max_mem=max_mu_net,
                     enable_learning=True)
 
     # Read physical topology from file.
@@ -368,8 +372,8 @@ def allocate_chains(dcs, allocs):
             if vnf_name == 'source':
                 # create client with one interface
                 vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                        image='knodir/client', flavor_name="nat",
-                                                        network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+                        image='knodir/client', flavor_name="source",
+                        network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
                 vnfs[vnf_name].append({vnf_id: vnf_obj})
 
             elif vnf_name == 'nat':
@@ -423,8 +427,8 @@ def allocate_chains(dcs, allocs):
                 # address. So, if you change this address make sure it is changed inside
                 # client.ovpn file as well as subprocess mn.vpn route injection call below.
                 vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                        image='knodir/vpn-server', flavor_name="nat",
-                                                        network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
+                        image='knodir/vpn-server', flavor_name="sink",
+                        network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
                 vnfs[vnf_name].append({vnf_id: vnf_obj})
 
             else:
@@ -592,22 +596,22 @@ if __name__ == '__main__':
     vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-nss-1rack-8servers
     pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
-    net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
+    net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 0.9, 28672)
 
     # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-azure-1rack-24servers
     # pn_fname = "../topologies/e2-azure-1rack-24servers.pn.json"
-    # net, api, dcs, tors = prepareDC(pn_fname, 20, 17408, 512, 417792)
+    # net, api, dcs, tors = prepareDC(pn_fname, 20, 17408, 0.9, 417792)
 
     # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-azure-1rack-48servers (or 50 servers)
     # pn_fname = "../topologies/e2-azure-1rack-48servers.pn.json"
-    # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 512, 417792)
+    # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 0.9, 417792)
 
     # e2-azure-1rack-50servers
     #vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
     #pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
-    #net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 512, 417792)
+    #net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 0.9, 417792)
 
     # start API and containernet
     api.start()
