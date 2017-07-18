@@ -89,6 +89,25 @@ def clean_stale(cmds):
     return cmds
 
 
+def clean_stale_alloc(num_of_chains):
+    cmds = []
+    # kill existing tcpreplay and dstat, and copy traces to the source VNF
+    for chain_index in range(num_of_chains):
+        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "pkill tcpreplay"' % chain_index)
+        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "pkill python2"' % chain_index)
+        # remove stale dstat output file (if any)
+        cmds.append('sudo docker cp ../topologies/output.pcap mn.chain%d-source:/' % chain_index)
+
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+    cmds[:] = []
+
+    print('cleanup done; wait 3s for stale processes cleanup')
+    sleep(3)
+
+
 def clean_and_save(cmds, testName):
 
     cmds.append('sudo docker exec -i mn.client /bin/bash -c "pkill tcpreplay"')
@@ -275,7 +294,8 @@ class RunBench(cmd.Cmd):
         return True
 
     def do_help(self, line):
-        commands = ['help', 'upgrade', 'switch', 'restore', 'scaleout', 'q | quit']
+        commands = ['help', 'allocate', 'upgrade', 'switch', 'restore',
+                'scaleout', 'q | quit']
         print("list of supported commands: %s" % commands)
 
     def default(self, line):
@@ -377,6 +397,85 @@ class RunBench(cmd.Cmd):
 
         # clean and save the results in csv file named after the test
         cmds = clean_and_save(cmds, "upgrade")
+
+        print('done')
+
+
+    def do_allocate(self, line):
+        """ Allocate E2 style chains. """
+
+        # list of commands to execute one-by-one
+        cmds = []
+        num_of_chains = int(line)
+
+        # kill existing tcpreplay and dstat, and copy traces to the source VNF
+        for chain_index in range(num_of_chains):
+            cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "pkill tcpreplay"' % chain_index)
+            cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "pkill python2"' % chain_index)
+            # remove stale dstat output file (if any)
+            cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "rm /tmp/dstat.csv"' % chain_index)
+            cmds.append('sudo docker cp ../traces/output.pcap mn.chain%d-source:/' % chain_index)
+
+        for cmd in cmds:
+            execStatus = subprocess.call(cmd, shell=True)
+            print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+        cmds[:] = []
+
+        for chain_index in range(num_of_chains):
+            cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "dstat --net --time -N tun0 --bits --output /tmp/dstat.csv" &' % chain_index)
+
+        for cmd in cmds:
+            execStatus = subprocess.call(cmd, shell=True)
+            print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+        cmds[:] = []
+        print('>>> wait 10s for dstats to initialize')
+        sleep(10)
+        print('<<< wait complete.')
+
+        for chain_index in range(num_of_chains):
+            # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
+            cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=100 --mbps=10 -d 1 --intf1=intf1 /output.pcap" &' % chain_index)
+
+        for cmd in cmds:
+            execStatus = subprocess.call(cmd, shell=True)
+            print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+        cmds[:] = []
+
+        # kill existing tcpreplay and dstat
+        for chain_index in range(num_of_chains):
+            cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "pkill tcpreplay"' % chain_index)
+            cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "pkill python2"' % chain_index)
+
+        for cmd in cmds:
+            execStatus = subprocess.call(cmd, shell=True)
+            print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+        cmds[:] = []
+
+        print('>>> wait 10s for dstats to terminate')
+        sleep(10)
+        print('<<< wait complete.')
+
+        # copy .csv results from VNF to the host
+        for chain_index in range(num_of_chains):
+            cmds.append('sudo docker cp mn.chain%d-sink:/tmp/dstat.csv ./results/e2-allocate-from-chain%d-sink.csv' % chain_index)
+
+        for cmd in cmds:
+            execStatus = subprocess.call(cmd, shell=True)
+            print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+        cmds[:] = []
+
+        # remove dstat output files
+        for chain_index in range(num_of_chains):
+            cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "rm /tmp/dstat.csv"' % chain_index)
+
+        for cmd in cmds:
+            execStatus = subprocess.call(cmd, shell=True)
+            print('returned %d from %s (0 is success)' % (execStatus, cmd))
 
         print('done')
 
