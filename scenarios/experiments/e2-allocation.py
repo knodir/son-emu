@@ -143,10 +143,10 @@ def get_placement(pn_fname, vn_fname, algo):
         glog.info('using NetSolver for chain allocation')
 
         out_fname = '/tmp/ns_out.json'
-        # cmd = "export PYTHONHASHSEED=1 && python3 %s %s %s --output %s" % (
-        cmd = "export PYTHONHASHSEED=1 && python3 %s %s %s --output %s --no-repeat" % (
-            "../../../monosat_datacenter/src/vdcmapper.py", pn_fname,
-            vn_fname, out_fname)
+        # cmd = "export PYTHONHASHSEED=1 && python3 %s %s %s --output %s --no-repeat" % (
+        cmd = "export PYTHONHASHSEED=1 && python3 %s %s %s --output %s %s" % (
+            "../../../monosat_datacenter/src/netsolver_nfv.py", pn_fname,
+            vn_fname, out_fname, '--max-resource 4')
         execStatus = subprocess.call(cmd, shell=True)
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
 
