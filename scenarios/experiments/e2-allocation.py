@@ -596,22 +596,23 @@ if __name__ == '__main__':
     vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-nss-1rack-8servers
     pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
-    net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 0.9, 28672)
+    net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
 
     # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-azure-1rack-24servers
     # pn_fname = "../topologies/e2-azure-1rack-24servers.pn.json"
-    # net, api, dcs, tors = prepareDC(pn_fname, 20, 17408, 0.9, 417792)
+    # net, api, dcs, tors = prepareDC(pn_fname, 20, 17408, 1200, 417792)
 
     # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-azure-1rack-48servers (or 50 servers)
     # pn_fname = "../topologies/e2-azure-1rack-48servers.pn.json"
-    # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 0.9, 417792)
+    # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
+    # max_cu_net = 600 => 10 dc_cu x 60 physical cores
 
     # e2-azure-1rack-50servers
     #vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
     #pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
-    #net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 0.9, 417792)
+    #net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
 
     # start API and containernet
     api.start()
