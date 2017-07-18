@@ -444,6 +444,10 @@ class RunBench(cmd.Cmd):
 
         cmds[:] = []
 
+        print('>>> wait 60s to complete the experiment')
+        sleep(60)
+        print('<<< wait complete.')
+
         # kill existing tcpreplay and dstat
         for chain_index in range(num_of_chains):
             cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "pkill tcpreplay"' % chain_index)
@@ -461,7 +465,7 @@ class RunBench(cmd.Cmd):
 
         # copy .csv results from VNF to the host
         for chain_index in range(num_of_chains):
-            cmds.append('sudo docker cp mn.chain%d-sink:/tmp/dstat.csv ./results/e2-allocate-from-chain%d-sink.csv' % chain_index)
+            cmds.append('sudo docker cp mn.chain%d-sink:/tmp/dstat.csv ./results/e2-allocate-from-chain%d-sink.csv' % (chain_index, chain_index)
 
         for cmd in cmds:
             execStatus = subprocess.call(cmd, shell=True)
