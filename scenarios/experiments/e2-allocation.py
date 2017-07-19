@@ -647,5 +647,4 @@ if __name__ == '__main__':
     net.stop()
 
     cleanup()
-
     os.system("sudo ../clean-stale.sh")
