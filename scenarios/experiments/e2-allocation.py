@@ -627,8 +627,8 @@ if __name__ == '__main__':
     # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
     algos = ['netsolver', 'random', 'packing']
     allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
-    # allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
-    # allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
+    #allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
+    #allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
     num_of_chains = 0
     for alloc in allocs:
         if alloc.startswith('allocation'):

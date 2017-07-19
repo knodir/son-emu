@@ -436,7 +436,7 @@ class RunBench(cmd.Cmd):
 
         for chain_index in range(num_of_chains):
             # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
-            cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=100 -d 1 --intf1=intf1 /output.pcap" &' % chain_index)
+            cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=10 -d 1 --intf1=intf1 /output.pcap" &' % chain_index)
 
         for cmd in cmds:
             execStatus = subprocess.call(cmd, shell=True)
