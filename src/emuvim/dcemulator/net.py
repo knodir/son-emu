@@ -113,7 +113,7 @@ class DCNetwork(Containernet):
         self.DCNetwork_graph = nx.MultiDiGraph()
 
         # initialize pool of vlan tags to setup the SDN paths
-        self.vlans = range(4096)[::-1]
+        self.vlans = range(1, 4096)[::-1]
 
         # link to Ryu REST_API
         ryu_ip = 'localhost'
@@ -707,6 +707,7 @@ class DCNetwork(Containernet):
                 if self.controller == RemoteController:
                     ## set flow entry via ryu rest api
                     self._set_flow_entry_ryu_rest(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
+                    # self._set_flow_entry_dpctl(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
                 else:
                     ## set flow entry via ovs-ofctl
                     self._set_flow_entry_dpctl(current_node, switch_inport_nr, switch_outport_nr, **kwargs)

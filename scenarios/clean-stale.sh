@@ -3,9 +3,9 @@
 sudo docker stop $(docker ps -a -q)
 sudo docker rm $(docker ps -a -q)
 sudo mn -c
-sudo killall -9 python
-sudo killall -9 containerd-shim
-sudo killall -9 docker
-
+sudo killall python
+sudo killall containerd-shim
+sudo killall docker
+sudo killall /usr/bin/dockerd
 ps -ef | grep python
 ps -ef | grep docker

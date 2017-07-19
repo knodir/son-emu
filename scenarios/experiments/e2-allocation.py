@@ -439,7 +439,6 @@ def allocate_chains(dcs, allocs):
 
         glog.info('successfully created chain: %d', chain_index)
         chain_index += 1
-
     return vnfs
 
 
@@ -478,9 +477,9 @@ def plumb_chains(net, vnfs, num_of_chains):
         execStatus = subprocess.call(cmd, shell=True)
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
 
-    glog.info('> sleeping 300s to let fw, ids, nat initialize properly...')
-    time.sleep(300)
-    glog.info('< 300s wait complete')
+    glog.info('> sleeping 120s to let fw, ids, nat initialize properly...')
+    time.sleep(120)
+    glog.info('< 120s wait complete')
     glog.info('start VNF chaining')
 
     # chain 'client <-> nat <-> fw <-> ids <-> vpn <-> server'
@@ -593,10 +592,10 @@ def plumb_chains(net, vnfs, num_of_chains):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
-    vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
+    #vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-nss-1rack-8servers
-    pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
-    net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
+    #pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
+    #net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
 
     # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-azure-1rack-24servers
@@ -610,9 +609,9 @@ if __name__ == '__main__':
     # max_cu_net = 600 => 10 dc_cu x 60 physical cores
 
     # e2-azure-1rack-50servers
-    #vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
-    #pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
-    #net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
+    vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
+    pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
+    net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
 
     # start API and containernet
     api.start()
@@ -621,15 +620,13 @@ if __name__ == '__main__':
     # allocate servers (Sonata DC construct) to place chains
     # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
     algos = ['netsolver', 'random', 'packing']
-    # allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
-    # allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
-    allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
-
+    #allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
+    allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
+    #allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
     glog.info('allocs: %s; len = %d', allocs, len(allocs))
-
+    #sys.exit(0)
     # allocate chains by placing them on appropriate servers
     vnfs = allocate_chains(dcs, allocs)
-
     # configure the datapath on chains to push packets through them
     plumb_chains(net, vnfs, len(allocs))
     glog.info('successfully plumbed %d chains', len(allocs))

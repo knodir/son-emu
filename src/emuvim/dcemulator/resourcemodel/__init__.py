@@ -126,26 +126,26 @@ class BaseResourceModel(object):
             "xlarge", {"compute": 16.0, "memory": 1024, "disk": 160}))
 
         self.addFlavour(ResourceFlavor(
-            "source", {"compute": 0.5, "memory": 1024, "disk": 20}))    # CPU: 1/4 Memory: 1/2
+            "source", {"compute": 1, "memory": 512, "disk": 20}))    # CPU: 1/4 Memory: 1/2
         self.addFlavour(ResourceFlavor(
-            "sink", {"compute": 0.5, "memory": 1024, "disk": 20}))    # CPU: 1/4 Memory: 1/2
+            "sink", {"compute": 1, "memory": 512, "disk": 20}))    # CPU: 1/4 Memory: 1/2
         self.addFlavour(ResourceFlavor(
-            "nat", {"compute": 0.5, "memory": 1024, "disk": 20}))    # CPU: 1/4 Memory: 1/2
+            "nat", {"compute": 1, "memory": 512, "disk": 20}))    # CPU: 1/4 Memory: 1/2
         self.addFlavour(ResourceFlavor(
-            "fw", {"compute": 1, "memory": 1536, "disk": 20}))     # CPU: 3/8 Memory: 3/4
+            "fw", {"compute": 3, "memory": 512, "disk": 20}))     # CPU: 3/8 Memory: 3/4
         self.addFlavour(ResourceFlavor(
-            "ids", {"compute": 1, "memory": 1536, "disk": 20}))   # CPU: 1/2 Memory: 3/4
+            "ids", {"compute": 4, "memory": 2048, "disk": 20}))   # CPU: 1/2 Memory: 3/4
         self.addFlavour(ResourceFlavor(
-            "vpn", {"compute": 0.5, "memory": 1024, "disk": 20}))    # CPU: 1/4 Memory: 1/2
+            "vpn", {"compute": 2, "memory": 512, "disk": 20}))    # CPU: 1/4 Memory: 1/2
 
         self.addFlavour(ResourceFlavor(
-            "gw", {"compute": 0.25, "memory": 1024, "disk": 20}))     # CPU: 1/4 Memory: 1/2
+            "gw", {"compute": 1, "memory": 1024, "disk": 20}))     # CPU: 1/4 Memory: 1/2
         self.addFlavour(ResourceFlavor(
-            "wc", {"compute": 0.25, "memory": 1536, "disk": 20}))    # CPU: 1/4 Memory: 3/4
+            "wc", {"compute": 1, "memory": 1536, "disk": 20}))    # CPU: 1/4 Memory: 3/4
         self.addFlavour(ResourceFlavor(
-            "re", {"compute": 0.25, "memory": 1536, "disk": 20}))    # CPU: 1/4 Memory: 3/4
+            "re", {"compute": 1, "memory": 1536, "disk": 20}))    # CPU: 1/4 Memory: 3/4
         self.addFlavour(ResourceFlavor(
-            "lb", {"compute": 0.375, "memory": 1536, "disk": 20}))    # CPU: 3/8 Memory: 3/4
+            "lb", {"compute": 3, "memory": 1536, "disk": 20}))    # CPU: 3/8 Memory: 3/4
 
     def addFlavour(self, fl):
         """
