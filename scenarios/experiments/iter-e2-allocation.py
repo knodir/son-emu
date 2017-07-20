@@ -135,7 +135,7 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     return (net, api, dcs, tors)
 
 
-def get_placement(dcs, pn_fname, vn_fname, algo):
+def get_placement(dcs, pn_fname, vn_fname, algo, mbps):
     """ Does chain placement with NetSolver and returns the output. """
 
     if algo == 'netsolver':
@@ -325,9 +325,10 @@ def get_placement(dcs, pn_fname, vn_fname, algo):
 
             # add this chain allocation to the list of allocations
             allocations['allocation_%d' % chain_index] = {
-                'assignment': assignments, 'bandwidth': bandwidth}            
+                'assignment': assignments, 'bandwidth': bandwidth}
             vnfs = allocate_chains(dcs, allocations, chain_index)
-            plumb_chains(net, vnfs, 1, chain_index)
+            plumb_chains(net, vnfs, 1)
+            start_benchmark(algo, chain_index, mbps)
             allocations = {}
             # increment chain index and renew assignment after completing each
             # chain allocation
@@ -344,13 +345,12 @@ def get_placement(dcs, pn_fname, vn_fname, algo):
     # }
 
     # glog.info('allocations: %s' % allocations)
-    return allocations
+    return chain_index
 
 
 def allocate_chains(dcs, allocs, chain_index):
     """ Create chains by assigning VNF to their respective server. """
 
-    fl = "large"
     # vnfs holds array of each VNF type
     vnfs = {'source': [], 'nat': [], 'fw': [], 'ids': [], 'vpn': [], 'sink': []}
 
@@ -360,10 +360,6 @@ def allocate_chains(dcs, allocs, chain_index):
             glog.info('not an allocation, but metadata: %s', alloc_name)
             continue
         glog.info('started allocating chain: %d', chain_index)
-        try:
-            glog.info('Chain Mapping: %s', chain_mapping['assignment'])
-        except TypeError:
-            glog.info('Chain Mapping: %f', chain_mapping)
 
         # iterate over each chain and create chain VNFs by placing it on an
         # appropriate server (such as chosen by NetSolver)..
@@ -401,7 +397,7 @@ def allocate_chains(dcs, allocs, chain_index):
                 # node-upgrade experiment requires knodir/sonata-fw-vnf:upgrade
                 # image as it has an additional interface for ids2.
                 vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                        image='knodir/sonata-fw-vnf:alloc', flavor_name="fw",
+                                                        image='knodir/sonata-fw-test', flavor_name="fw",
                                                         network=[{'id': 'input', 'ip': '10.0.1.5/24'},
                                                                  {'id': 'output-ids', 'ip': '10.0.1.61/24'},
                                                                  {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
@@ -448,7 +444,7 @@ def allocate_chains(dcs, allocs, chain_index):
     return vnfs
 
 
-def plumb_chains(net, vnfs, num_of_chains, chain_index):
+def plumb_chains(net, vnfs, num_of_chains):
     # vnfs have the following format:
     # {fw: [{chain0_fw: obj}, {chain1_fw: obj}, ...],
     #  nat: [{chain0_nat: obj}, {chain1_nat: obj}, ...],
@@ -489,42 +485,42 @@ def plumb_chains(net, vnfs, num_of_chains, chain_index):
     glog.info('start VNF chaining')
 
     # chain 'client <-> nat <-> fw <-> ids <-> vpn <-> server'
-
-    pair_src_name = vnfs['source'][chain_index].keys()[0]
-    pair_dst_name = vnfs['nat'][chain_index].keys()[0]
-    res = net.setChain(pair_src_name, pair_dst_name, 'intf1', 'input',
+    for chain_index in range(num_of_chains):
+        pair_src_name = vnfs['source'][chain_index].keys()[0]
+        pair_dst_name = vnfs['nat'][chain_index].keys()[0]
+        res = net.setChain(pair_src_name, pair_dst_name, 'intf1', 'input',
                            bidirectional=True, cmd='add-flow')
-    glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
-    pair_src_name = vnfs['nat'][chain_index].keys()[0]
-    pair_dst_name = vnfs['fw'][chain_index].keys()[0]
-    res = net.setChain(pair_src_name, pair_dst_name, 'output', 'input',
+        pair_src_name = vnfs['nat'][chain_index].keys()[0]
+        pair_dst_name = vnfs['fw'][chain_index].keys()[0]
+        res = net.setChain(pair_src_name, pair_dst_name, 'output', 'input',
                            bidirectional=True, cmd='add-flow')
-    glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
-    pair_src_name = vnfs['fw'][chain_index].keys()[0]
-    pair_dst_name = vnfs['ids'][chain_index].keys()[0]
-    res = net.setChain(pair_src_name, pair_dst_name, 'output-ids', 'input',
+        pair_src_name = vnfs['fw'][chain_index].keys()[0]
+        pair_dst_name = vnfs['ids'][chain_index].keys()[0]
+        res = net.setChain(pair_src_name, pair_dst_name, 'output-ids', 'input',
                            bidirectional=True, cmd='add-flow')
-    glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
-    pair_src_name = vnfs['fw'][chain_index].keys()[0]
-    pair_dst_name = vnfs['vpn'][chain_index].keys()[0]
-    res = net.setChain(pair_src_name, pair_dst_name, 'output-vpn', 'input-fw',
+        pair_src_name = vnfs['fw'][chain_index].keys()[0]
+        pair_dst_name = vnfs['vpn'][chain_index].keys()[0]
+        res = net.setChain(pair_src_name, pair_dst_name, 'output-vpn', 'input-fw',
                            bidirectional=True, cmd='add-flow')
-    glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
-    pair_src_name = vnfs['ids'][chain_index].keys()[0]
-    pair_dst_name = vnfs['vpn'][chain_index].keys()[0]
-    res = net.setChain(pair_src_name, pair_dst_name, 'output', 'input-ids',
+        pair_src_name = vnfs['ids'][chain_index].keys()[0]
+        pair_dst_name = vnfs['vpn'][chain_index].keys()[0]
+        res = net.setChain(pair_src_name, pair_dst_name, 'output', 'input-ids',
                            bidirectional=True, cmd='add-flow')
-    glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
-    pair_src_name = vnfs['vpn'][chain_index].keys()[0]
-    pair_dst_name = vnfs['sink'][chain_index].keys()[0]
-    res = net.setChain(pair_src_name, pair_dst_name, 'output', 'intf2',
+        pair_src_name = vnfs['vpn'][chain_index].keys()[0]
+        pair_dst_name = vnfs['sink'][chain_index].keys()[0]
+        res = net.setChain(pair_src_name, pair_dst_name, 'output', 'intf2',
                            bidirectional=True, cmd='add-flow')
-    glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
     cmds = []
 
@@ -583,20 +579,101 @@ def plumb_chains(net, vnfs, num_of_chains, chain_index):
         glog.info('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
+    # for chain_index in range(num_of_chains):
+    #     src_vnf_name = vnfs['source'][chain_index].keys()[0]
+    #     dst_vnf_name = vnfs['sink'][chain_index].keys()[0]
+    #     src_vnf_obj = vnfs['source'][chain_index][src_vnf_name]
+    #     dst_vnf_obj = vnfs['sink'][chain_index][dst_vnf_name]
+
+    #     ping_res = net.ping([src_vnf_obj, dst_vnf_obj], timeout=5)
+
+    #     glog.info('ping %s -> %s. Packet drop %s%%',
+    #               src_vnf_name, dst_vnf_name, ping_res)
+
+
+def start_benchmark(algo, chain_index, mbps):
+    """ Allocate E2 style chains. """
+
+    # list of commands to execute one-by-one
+    cmds = []
+
+    # copy traces to the source VNF
+    cmds.append('sudo docker cp ../traces/output.pcap mn.chain%d-source:/' % chain_index)
+
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+    cmds[:] = []
+
+    cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "dstat --net --time -N intf2 --bits --output /tmp/dstat.csv" &'
+                % chain_index)
+
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+    cmds[:] = []
+    print('>>> wait 10s for dstats to initialize')
+    time.sleep(10)
+    print('<<< wait complete.')
+    print(mbps)
+    # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
+    cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=10 -d 1 --intf1=intf1 /output.pcap" &'
+                % chain_index)
+
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+    cmds[:] = []
+
+
+def finish_benchmarks(line, algo, mbps):
+
+    # list of commands to execute one-by-one
+    cmds = []
+    num_of_chains = int(line)
+
+    # kill existing tcpreplay and dstat
     for chain_index in range(num_of_chains):
-        src_vnf_name = vnfs['source'][chain_index].keys()[0]
-        dst_vnf_name = vnfs['sink'][chain_index].keys()[0]
-        src_vnf_obj = vnfs['source'][chain_index][src_vnf_name]
-        dst_vnf_obj = vnfs['sink'][chain_index][dst_vnf_name]
+        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "pkill tcpreplay"' % chain_index)
+        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "pkill python2"' % chain_index)
 
-        ping_res = net.ping([src_vnf_obj, dst_vnf_obj], timeout=5)
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
 
-        glog.info('ping %s -> %s. Packet drop %s%%',
-                  src_vnf_name, dst_vnf_name, ping_res)
+    cmds[:] = []
+
+    print('>>> wait 10s for dstats to terminate')
+    time.sleep(10)
+    print('<<< wait complete.')
+
+    # copy .csv results from VNF to the host
+    for chain_index in range(num_of_chains):
+        cmds.append('sudo docker cp mn.chain%d-sink:/tmp/dstat.csv ./results/iter_allocation/%s%de2-allocate-from-chain%d-sink.csv'
+                    % (chain_index, algo, mbps, chain_index))
+
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+    cmds[:] = []
+
+    # remove dstat output files
+    for chain_index in range(num_of_chains):
+        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "rm /tmp/dstat.csv"' % chain_index)
+
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+    print('done')
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-nss-1rack-8servers
@@ -615,9 +692,9 @@ if __name__ == '__main__':
     # max_cu_net = 600 => 10 dc_cu x 60 physical cores
 
     # e2-azure-1rack-50servers
-    #vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
-    #pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
-    #net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
+    # vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
+    # pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
+    # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
 
     # start API and containernet
     api.start()
@@ -626,23 +703,21 @@ if __name__ == '__main__':
     # allocate servers (Sonata DC construct) to place chains
     # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
     algos = ['netsolver', 'random', 'packing']
-    #allocs = get_placement(dcs, pn_fname, vn_fname, algos[0])  # netsolver
-    #allocs = get_placement(dcs, pn_fname, vn_fname, algos[1])  # random
-    allocs = get_placement(dcs, pn_fname, vn_fname, algos[2])  # packing
-    num_of_chains = 0
-    for alloc in allocs:
-        if alloc.startswith('allocation'):
-            num_of_chains += 1
+    placement_algorithm = algos[0]  # netsolver
+    placement_algorithm = algos[1]  # random
+    placement_algorithm = algos[2]  # packing
+    mbps = 10.0
+    allocs = get_placement(dcs, pn_fname, vn_fname, placement_algorithm, mbps)
+    num_of_chains = allocs
 
     glog.info('allocs: %s; num_of_chains = %d', allocs, num_of_chains)
-    # sys.exit(0)
-    # allocate chains by placing them on appropriate servers
-    #vnfs = allocate_chains(dcs, allocs)
-    # configure the datapath on chains to push packets through them
-    #plumb_chains(net, vnfs, num_of_chains)
-    glog.info('successfully plumbed %d chains', num_of_chains)
     glog.info('Chain setup done. You should see the terminal now.')
 
+    print('>>> wait 30s to complete the experiment')
+    time.sleep(30)
+    print('<<< wait complete.')
+    print('Cleaning up benchmarking information')
+    finish_benchmarks(num_of_chains, placement_algorithm, mbps)
     net.CLI()
     net.stop()
 
