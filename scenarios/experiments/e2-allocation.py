@@ -483,9 +483,9 @@ def plumb_chains(net, vnfs, num_of_chains):
         execStatus = subprocess.call(cmd, shell=True)
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
 
-    glog.info('> sleeping 120s to let fw, ids, nat initialize properly...')
-    time.sleep(120)
-    glog.info('< 120s wait complete')
+    glog.info('> sleeping 5s to let fw, ids, nat initialize properly...')
+    time.sleep(5)
+    glog.info('< 5s wait complete')
     glog.info('start VNF chaining')
 
     # chain 'client <-> nat <-> fw <-> ids <-> vpn <-> server'
@@ -551,9 +551,9 @@ def plumb_chains(net, vnfs, num_of_chains):
         glog.info('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
-    glog.info('> sleeping 180s to let VPN client initialize...')
-    time.sleep(180)
-    glog.info('< 180s wait complete')
+    glog.info('> sleeping 5s to let VPN client initialize...')
+    time.sleep(5)
+    glog.info('< 5s wait complete')
     glog.info('VPN client VNF started')
 
     for vnf_name_and_obj in vnfs['nat']:
@@ -627,8 +627,8 @@ if __name__ == '__main__':
     # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
     algos = ['netsolver', 'random', 'packing']
     allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
-    #allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
-    #allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
+    # allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
+    # allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
     num_of_chains = 0
     for alloc in allocs:
         if alloc.startswith('allocation'):
