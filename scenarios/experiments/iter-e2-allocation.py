@@ -326,8 +326,8 @@ def get_placement(dcs, pn_fname, vn_fname, algo):
             # add this chain allocation to the list of allocations
             allocations['allocation_%d' % chain_index] = {
                 'assignment': assignments, 'bandwidth': bandwidth}            
-            allocate_chains(dcs, allocations)
-            plumb_chains(net, vnfs, 1)
+            vnfs = allocate_chains(dcs, allocations, chain_index)
+            plumb_chains(net, vnfs, 1, chain_index)
             allocations = {}
             # increment chain index and renew assignment after completing each
             # chain allocation
@@ -347,11 +347,10 @@ def get_placement(dcs, pn_fname, vn_fname, algo):
     return allocations
 
 
-def allocate_chains(dcs, allocs):
+def allocate_chains(dcs, allocs, chain_index):
     """ Create chains by assigning VNF to their respective server. """
 
     fl = "large"
-    chain_index = 0
     # vnfs holds array of each VNF type
     vnfs = {'source': [], 'nat': [], 'fw': [], 'ids': [], 'vpn': [], 'sink': []}
 
@@ -446,11 +445,10 @@ def allocate_chains(dcs, allocs):
             glog.info('successfully created VNF: %s', vnf_id)
 
         glog.info('successfully created chain: %d', chain_index)
-        chain_index += 1
     return vnfs
 
 
-def plumb_chains(net, vnfs, num_of_chains):
+def plumb_chains(net, vnfs, num_of_chains, chain_index):
     # vnfs have the following format:
     # {fw: [{chain0_fw: obj}, {chain1_fw: obj}, ...],
     #  nat: [{chain0_nat: obj}, {chain1_nat: obj}, ...],
@@ -491,42 +489,42 @@ def plumb_chains(net, vnfs, num_of_chains):
     glog.info('start VNF chaining')
 
     # chain 'client <-> nat <-> fw <-> ids <-> vpn <-> server'
-    for chain_index in range(num_of_chains):
-        pair_src_name = vnfs['source'][chain_index].keys()[0]
-        pair_dst_name = vnfs['nat'][chain_index].keys()[0]
-        res = net.setChain(pair_src_name, pair_dst_name, 'intf1', 'input',
-                           bidirectional=True, cmd='add-flow')
-        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
-        pair_src_name = vnfs['nat'][chain_index].keys()[0]
-        pair_dst_name = vnfs['fw'][chain_index].keys()[0]
-        res = net.setChain(pair_src_name, pair_dst_name, 'output', 'input',
+    pair_src_name = vnfs['source'][chain_index].keys()[0]
+    pair_dst_name = vnfs['nat'][chain_index].keys()[0]
+    res = net.setChain(pair_src_name, pair_dst_name, 'intf1', 'input',
                            bidirectional=True, cmd='add-flow')
-        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+    glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
-        pair_src_name = vnfs['fw'][chain_index].keys()[0]
-        pair_dst_name = vnfs['ids'][chain_index].keys()[0]
-        res = net.setChain(pair_src_name, pair_dst_name, 'output-ids', 'input',
+    pair_src_name = vnfs['nat'][chain_index].keys()[0]
+    pair_dst_name = vnfs['fw'][chain_index].keys()[0]
+    res = net.setChain(pair_src_name, pair_dst_name, 'output', 'input',
                            bidirectional=True, cmd='add-flow')
-        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+    glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
-        pair_src_name = vnfs['fw'][chain_index].keys()[0]
-        pair_dst_name = vnfs['vpn'][chain_index].keys()[0]
-        res = net.setChain(pair_src_name, pair_dst_name, 'output-vpn', 'input-fw',
+    pair_src_name = vnfs['fw'][chain_index].keys()[0]
+    pair_dst_name = vnfs['ids'][chain_index].keys()[0]
+    res = net.setChain(pair_src_name, pair_dst_name, 'output-ids', 'input',
                            bidirectional=True, cmd='add-flow')
-        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+    glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
-        pair_src_name = vnfs['ids'][chain_index].keys()[0]
-        pair_dst_name = vnfs['vpn'][chain_index].keys()[0]
-        res = net.setChain(pair_src_name, pair_dst_name, 'output', 'input-ids',
+    pair_src_name = vnfs['fw'][chain_index].keys()[0]
+    pair_dst_name = vnfs['vpn'][chain_index].keys()[0]
+    res = net.setChain(pair_src_name, pair_dst_name, 'output-vpn', 'input-fw',
                            bidirectional=True, cmd='add-flow')
-        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+    glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
-        pair_src_name = vnfs['vpn'][chain_index].keys()[0]
-        pair_dst_name = vnfs['sink'][chain_index].keys()[0]
-        res = net.setChain(pair_src_name, pair_dst_name, 'output', 'intf2',
+    pair_src_name = vnfs['ids'][chain_index].keys()[0]
+    pair_dst_name = vnfs['vpn'][chain_index].keys()[0]
+    res = net.setChain(pair_src_name, pair_dst_name, 'output', 'input-ids',
                            bidirectional=True, cmd='add-flow')
-        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+    glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+
+    pair_src_name = vnfs['vpn'][chain_index].keys()[0]
+    pair_dst_name = vnfs['sink'][chain_index].keys()[0]
+    res = net.setChain(pair_src_name, pair_dst_name, 'output', 'intf2',
+                           bidirectional=True, cmd='add-flow')
+    glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
     cmds = []
 
@@ -629,8 +627,8 @@ if __name__ == '__main__':
     # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
     algos = ['netsolver', 'random', 'packing']
     #allocs = get_placement(dcs, pn_fname, vn_fname, algos[0])  # netsolver
-    allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
-    # allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
+    #allocs = get_placement(dcs, pn_fname, vn_fname, algos[1])  # random
+    allocs = get_placement(dcs, pn_fname, vn_fname, algos[2])  # packing
     num_of_chains = 0
     for alloc in allocs:
         if alloc.startswith('allocation'):
