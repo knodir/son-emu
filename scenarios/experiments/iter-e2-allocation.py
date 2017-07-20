@@ -135,7 +135,7 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     return (net, api, dcs, tors)
 
 
-def get_placement(pn_fname, vn_fname, algo):
+def get_placement(dcs, pn_fname, vn_fname, algo):
     """ Does chain placement with NetSolver and returns the output. """
 
     if algo == 'netsolver':
@@ -326,83 +326,9 @@ def get_placement(pn_fname, vn_fname, algo):
             # add this chain allocation to the list of allocations
             allocations['allocation_%d' % chain_index] = {
                 'assignment': assignments, 'bandwidth': bandwidth}            
-            for vnf_mapping in assignments:
-                glog.info('vnf_mapping = %s', vnf_mapping)
-                vnf_name = vnf_mapping[0]
-                server_name = vnf_mapping[1]
-
-                vnf_prefix = 'chain%d' % chain_index
-                vnf_id = '%s-%s' % (vnf_prefix, vnf_name)
-                vnf_obj = None
-                glog.info('creating %s on %s', vnf_id, server_name)
-    
-                if vnf_name == 'source':
-                    # create client with one interface
-                    vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                            image='knodir/client', flavor_name="source",
-                                                            network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
-                    vnfs[vnf_name].append({vnf_id: vnf_obj})
-    
-                elif vnf_name == 'nat':
-                    # create NAT VNF with two interfaces. Its 'input'
-                    # interface faces the client and output interface the server VNF.
-                    vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                            image='knodir/nat', flavor_name="nat",
-                                                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
-                                                                     {'id': 'output', 'ip': '10.0.1.4/24'}])
-                    vnfs[vnf_name].append({vnf_id: vnf_obj})
-    
-                elif vnf_name == 'fw':
-                    # create fw VNF with three interfaces. 'input' interface for
-                    # 'nat', 'output-ids' interface for 'ids' VNF, and 'output-vpn'
-                    # for VPN VNF. All three interfaces are bridged to ovs1 bridge.
-                    # knodir/sonata-fw-vnf:alloc image  has OVS and Ryu controller,
-                    # and is specifically designed for e2-allocations experiment.
-                    # node-upgrade experiment requires knodir/sonata-fw-vnf:upgrade
-                    # image as it has an additional interface for ids2.
-                    vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                            image='knodir/sonata-fw-vnf:alloc', flavor_name="fw",
-                                                            network=[{'id': 'input', 'ip': '10.0.1.5/24'},
-                                                                     {'id': 'output-ids', 'ip': '10.0.1.61/24'},
-                                                                     {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
-                    vnfs[vnf_name].append({vnf_id: vnf_obj})
-    
-                elif vnf_name == 'ids':
-                    # create ids VNF with two interfaces. 'input' interface for 'fw' and
-                    # 'output' interface for the 'server' VNF.
-                    vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                            image='knodir/snort-trusty', flavor_name="ids",
-                                                            network=[{'id': 'input', 'ip': '10.0.1.70/24'},
-                                                                     {'id': 'output', 'ip': '10.0.1.80/24'}])
-                    vnfs[vnf_name].append({vnf_id: vnf_obj})
-    
-                elif vnf_name == 'vpn':
-                    # create VPN VNF with two interfaces. Its 'input'
-                    # interface faces the client and output interface the server VNF.
-                    vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                            image='knodir/vpn-client', flavor_name="vpn",
-                                                            network=[{'id': 'input-ids', 'ip': '10.0.1.91/24'},
-                                                                     {'id': 'input-fw', 'ip': '10.0.1.92/24'},
-                                                                     {'id': 'output', 'ip': '10.0.10.2/24'}])
-                    vnfs[vnf_name].append({vnf_id: vnf_obj})
-    
-                elif vnf_name == 'sink':
-                    # create server VNF with one interface. Do not change assigned 10.0.10.10/24
-                    # address of the server. It is the address VPN clients use to connect to the
-                    # server and this address is hardcoded inside client.ovpn of the vpn-client
-                    # Docker image. We also remove the injected routing table entry for this
-                    # address. So, if you change this address make sure it is changed inside
-                    # client.ovpn file as well as subprocess mn.vpn route injection call below.
-                    vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                            image='knodir/vpn-server', flavor_name="sink",
-                                                            network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
-                    vnfs[vnf_name].append({vnf_id: vnf_obj})
-    
-                else:
-                    glog.error('ERROR: unknown VNF type: %s', vnf_name)
-                    sys.exit(1)
-                glog.info('successfully created VNF: %s', vnf_id)
-                plumb_chains(net, vnfs, 1)
+            allocate_chains(dcs, allocations)
+            plumb_chains(net, vnfs, 1)
+            allocations = {}
             # increment chain index and renew assignment after completing each
             # chain allocation
             chain_index += 1
@@ -674,10 +600,10 @@ def plumb_chains(net, vnfs, num_of_chains):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
-    # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
+    vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-nss-1rack-8servers
-    # pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
-    # net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
+    pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
+    net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
 
     # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-azure-1rack-24servers
@@ -691,9 +617,9 @@ if __name__ == '__main__':
     # max_cu_net = 600 => 10 dc_cu x 60 physical cores
 
     # e2-azure-1rack-50servers
-    vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
-    pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
-    net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
+    #vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
+    #pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
+    #net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
 
     # start API and containernet
     api.start()
@@ -702,8 +628,8 @@ if __name__ == '__main__':
     # allocate servers (Sonata DC construct) to place chains
     # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
     algos = ['netsolver', 'random', 'packing']
-    allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
-    # allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
+    #allocs = get_placement(dcs, pn_fname, vn_fname, algos[0])  # netsolver
+    allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
     # allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
     num_of_chains = 0
     for alloc in allocs:
@@ -713,9 +639,9 @@ if __name__ == '__main__':
     glog.info('allocs: %s; num_of_chains = %d', allocs, num_of_chains)
     # sys.exit(0)
     # allocate chains by placing them on appropriate servers
-    vnfs = allocate_chains(dcs, allocs)
+    #vnfs = allocate_chains(dcs, allocs)
     # configure the datapath on chains to push packets through them
-    plumb_chains(net, vnfs, num_of_chains)
+    #plumb_chains(net, vnfs, num_of_chains)
     glog.info('successfully plumbed %d chains', num_of_chains)
     glog.info('Chain setup done. You should see the terminal now.')
 
