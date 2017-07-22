@@ -26,9 +26,9 @@ ovs-vsctl add-br $NAME
 
 echo "skipping datapath setup"
 ovs-vsctl set bridge $NAME datapath_type=netdev
-ovs-vsctl set bridge $NAME protocols=OpenFlow10,OpenFlow12,OpenFlow13
-ovs-vsctl set-fail-mode $NAME standalone
-ovs-vsctl set bridge $NAME other_config:disable-in-band=true
+#ovs-vsctl set bridge $NAME protocols=OpenFlow10,OpenFlow12,OpenFlow13
+#ovs-vsctl set-fail-mode $NAME secure
+#ovs-vsctl set bridge $NAME other_config:disable-in-band=true
 ovs-vsctl set bridge $NAME other-config:datapath-id=$OVS_DPID
 
 ## now loop through the PORTS array
@@ -58,4 +58,3 @@ ovs-ofctl add-flow $NAME 'priority=3,in_port=1,tcp,tp_src=20,actions=output:3'
 ovs-ofctl add-flow $NAME 'priority=3,in_port=3,tcp,tp_src=20,actions=output:1'
 ovs-ofctl add-flow $NAME 'priority=3,in_port=1,tcp,tp_src=21,actions=output:3'
 ovs-ofctl add-flow $NAME 'priority=3,in_port=3,tcp,tp_src=21,actions=output:1'
-

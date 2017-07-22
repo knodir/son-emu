@@ -269,6 +269,207 @@ def scaleOut():
     net.CLI()
     net.stop()
 
+
+def set_bw(multiplier):
+    low_bw = 1 * multiplier / 10
+    high_bw = 2 * multiplier / 10
+    os.system('ovs-vsctl -- set Port dc1.s1-eth1 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc1.s1-eth2 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth2 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth3 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth4 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth5 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth6 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth6 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth7 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth8 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth9 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth10 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth11 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc3.s1-eth2 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+
+
+def scale_bw(multiplier):
+    low_bw = 1 * multiplier / 10
+    high_bw = 2 * multiplier / 10
+    os.system('ovs-vsctl -- set Port dc1.s1-eth1 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc1.s1-eth2 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth2 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth3 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth4 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth5 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth6 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth6 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth7 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth8 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth9 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth10 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc2.s1-eth11 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+    os.system('ovs-vsctl -- set Port dc3.s1-eth2 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw) + '0')
+
+
+def clean_stale(cmds):
+
+    # kill existing iperf server
+    # cmds.append('sudo docker exec -i mn.server /bin/bash -c "pkill iperf3"')
+    # remove stale iperf output file (if any)
+    # cmds.append('sudo docker exec -i mn.client /bin/bash -c "rm /tmp/iperf3.json"')
+    # kill existing dstat
+    cmds.append('sudo docker exec -i mn.client /bin/bash -c "pkill tcpreplay"')
+    cmds.append('sudo docker exec -i mn.client /bin/bash -c "pkill python2"')
+    cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "pkill python2"')
+    cmds.append('sudo docker exec -i mn.ids2 /bin/bash -c "pkill python2"')
+    cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "pkill python2"')
+    # remove stale dstat output file (if any)
+    cmds.append('sudo docker exec -i mn.client /bin/bash -c "rm /tmp/dstat.csv"')
+    cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "rm /tmp/dstat.csv"')
+    cmds.append('sudo docker exec -i mn.ids2 /bin/bash -c "rm /tmp/dstat.csv"')
+    cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "rm /tmp/dstat.csv"')
+
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+    cmds[:] = []
+
+    print('wait 3s for iperf server and other stale processes cleanup')
+    time.sleep(3)
+
+    return cmds
+
+
+def clean_and_save(cmds, testName):
+
+    cmds.append('sudo docker exec -i mn.client /bin/bash -c "pkill tcpreplay"')
+
+    print('wait 3s for iperf client and other processes terminate')
+    time.sleep(3)
+    # kill dstat daemons, they runs as python2 process.
+    cmds.append('sudo docker exec -i mn.client /bin/bash -c "pkill python2"')
+    cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "pkill python2"')
+    cmds.append('sudo docker exec -i mn.ids2 /bin/bash -c "pkill python2"')
+    cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "pkill python2"')
+    # copy the iperf client output file to the local machine
+    # cmds.append('sudo docker cp mn.client:/tmp/iperf3.json ./output/from-client.json')
+    cmds.append('sudo docker cp mn.client:/tmp/dstat.csv ./results/' + testName + '-from-client.csv')
+    cmds.append('sudo docker cp mn.ids1:/tmp/dstat.csv ./results/' + testName + '-from-ids1.csv')
+    cmds.append('sudo docker cp mn.ids2:/tmp/dstat.csv ./results/' + testName + '-from-ids2.csv')
+    cmds.append('sudo docker cp mn.vpn:/tmp/dstat.csv ./results/' + testName + '-from-vpn.csv')
+    # do remaining cleanup inside containers
+    # cmds.append('sudo docker exec -i mn.server /bin/bash -c "pkill iperf3"')
+
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+
+    cmds[:] = []
+
+    return cmds
+
+
+def benchmark(line, mbps):
+    """ Start traffic generation. """
+    multiplier = 10**7
+    # list of commands to execute one-by-one
+    cmds = []
+    # clean stale programs and remove old files
+    cmds.append('sudo rm ./results/scaleout-from-client.csv')
+    cmds.append('sudo rm ./results/scaleout-from-ids1.csv')
+    cmds.append('sudo rm ./results/scaleout-from-vpn.csv')
+
+    cmds = clean_stale(cmds)
+
+    # Set the initial bandwidth constraints of the system
+    set_bw(multiplier)
+    time.sleep(3)
+    # cmds.append('sudo docker exec -i mn.server /bin/bash -c "iperf3 -s --bind 10.8.0.1" &')
+    # cmds.append('sudo docker exec -i mn.client /bin/bash -c "dstat --net --time -N intf1 --bits --output /tmp/dstat.csv" &')
+    # cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "dstat --net --time -N input --bits --output /tmp/dstat.csv" &')
+    # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "dstat --net --time -N input-fw --bits --output /tmp/dstat.csv" &')
+    cmds.append('sudo timeout 70 dstat --net --time -N dc1.s1-eth1 --nocolor --output ./results/scaleout-from-client.csv &')
+    cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth7 --nocolor --output ./results/scaleout-from-ids1.csv &')
+    cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth4 --nocolor --output ./results/scaleout-from-vpn.csv &')
+
+    # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
+    cmds.append('sudo docker exec -i mn.client /bin/bash -c "tcpreplay --loop=100 --mbps=' +
+                str(multiplier / 10**6) + ' -d 1 --intf1=intf1 /ftp.ready.pcap" &')
+    # each loop is around 40s for 10 Mbps speed, 2 loops easily make 1m
+    cmds.append('sudo docker exec -i mn.client /bin/bash -c "tcpreplay --loop=2 --mbps=' +
+                str(multiplier / 10**6) + ' -d 1 --intf1=intf1 /output.pcap" &')
+
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+    cmds[:] = []
+    print("Generating traffic for 30 seconds")
+
+    # start scaling up the bandwidth after 30 seconds
+    time.sleep(30)
+    print("Scaling up bandwidth by factor of 1")
+    scale_bw(multiplier)
+    time.sleep(40)
+    # clean and save the results in csv file named after the test
+    # cmds = clean_and_save(cmds, "scaleout")
+    cmds.append('sudo killall dstat')
+    print('done')
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 

@@ -619,7 +619,7 @@ if __name__ == '__main__':
     # e2-azure-1rack-50servers
     vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
     pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
-    net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
+    net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 0.90, 417792)
 
     # start API and containernet
     api.start()
