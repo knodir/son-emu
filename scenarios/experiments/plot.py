@@ -234,7 +234,7 @@ def plot_allocate100():
     # algo_bw_files = {'random': [], 'packing': [], 'daisy': []}
     algo_bw_files = {'random100': [], 'packing100': [], 'daisy100': []}
 
-    base_path = './results/allocate'
+    base_path = './results/allocation'
 
     # algos = ['random', 'packing', 'daisy']
     # algos = ['random', 'packing']
@@ -291,7 +291,7 @@ def plot_allocate100():
     # vdc_names, bw_range, allocs_range)
 
 
-def plot_allocate():
+def plot_allocate10():
     # amount of seconds to skip data collection, and duration of the experiment
     omit_sec, duration = 10, 60
     # list of average bandwidth amount each chain gets
@@ -299,14 +299,14 @@ def plot_allocate():
     total_bw = {}
     total_allocs = {}
     # algo_bw_files = {'random': [], 'packing': [], 'daisy': []}
-    algo_bw_files = {'random': [], 'packing': [], 'daisy': []}
+    algo_bw_files = {'random10': [], 'packing10': [], 'daisy10': []}
 
-    base_path = './results/allocate'
+    base_path = './results/allocation'
 
     # algos = ['random', 'packing', 'daisy']
     # algos = ['random', 'packing']
     # algos = ['random']
-    algos = ['random', 'packing', 'daisy']
+    algos = ['random10', 'packing10', 'daisy10']
 
     for algo in algos:
         folder_name = '%s/%s' % (base_path, algo)
@@ -339,13 +339,13 @@ def plot_allocate():
 
     plot_file_name = 'results/allocate.png'
 
-    random_bw = total_bw['random']
-    packing_bw = total_bw['packing']
-    daisy_bw = total_bw['daisy']  # daisy']
+    random_bw = total_bw['random10']
+    packing_bw = total_bw['packing10']
+    daisy_bw = total_bw['daisy10']  # daisy']
 
-    random_allocs = total_allocs['random']
-    packing_allocs = total_allocs['packing']
-    daisy_allocs = total_allocs['daisy']  # daisy']
+    random_allocs = total_allocs['random10']
+    packing_allocs = total_allocs['packing10']
+    daisy_allocs = total_allocs['daisy10']  # daisy']
 
     vdc_names = algos
     bw_range = [0, 100]
@@ -360,5 +360,5 @@ def plot_allocate():
 if __name__ == '__main__':
     # plot_upgrade()
     # plot_scaleout()
-    plot_allocate()
+    plot_allocate10()
     plot_allocate100()

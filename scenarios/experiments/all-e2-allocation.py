@@ -136,10 +136,10 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
 
 
 def get_placement(pn_fname, vn_fname, algo):
-    """ Does chain placement with NetSolver and returns the output. """
+    """ Does chain placement with daisy and returns the output. """
 
-    if algo == 'netsolver':
-        glog.info('using NetSolver for chain allocation')
+    if algo == 'daisy':
+        glog.info('using daisy for chain allocation')
 
         out_fname = '/tmp/ns_out.json'
         # cmd = "export PYTHONHASHSEED=1 && python3 %s %s %s --output %s --no-repeat" % (
@@ -365,7 +365,7 @@ def allocate_chains(dcs, allocs):
             glog.info('Chain Mapping: %f', chain_mapping)
 
         # iterate over each chain and create chain VNFs by placing it on an
-        # appropriate server (such as chosen by NetSolver)..
+        # appropriate server (such as chosen by daisy)..
         for vnf_mapping in chain_mapping['assignment']:
             glog.info('vnf_mapping = %s', vnf_mapping)
             vnf_name = vnf_mapping[0]
@@ -658,10 +658,11 @@ def benchmark(algo, line, mbps):
     print('>>> wait 10s for dstats to terminate')
     time.sleep(10)
     print('<<< wait complete.')
-
+    cmds.append('mkdir ./results/allocation/%s%s' %
+                (algo, str(mbps)))
     # copy .csv results from VNF to the host
     for chain_index in range(num_of_chains):
-        cmds.append('sudo docker cp mn.chain%s-sink:/tmp/dstat.csv ./results/allocation/%s%se2-allocate-from-chain%s-sink.csv' %
+        cmds.append('sudo docker cp mn.chain%s-sink:/tmp/dstat.csv ./results/allocation/%s%s/e2-allocate-from-chain%s-sink.csv' %
                     (str(chain_index), algo, str(mbps), str(chain_index)))
 
     for cmd in cmds:
@@ -698,25 +699,26 @@ if __name__ == '__main__':
     # max_cu_net = 600 => 10 dc_cu x 60 physical cores
 
     # e2-nss-1rack-8servers
-    pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
-    vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
+    # pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
+    # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
 
     # e2-azure-1rack-50servers
-    # vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
-    # pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
-    algos = ['netsolver', 'random', 'packing']
+    vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
+    pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
+    algos = ['daisy', 'random', 'packing']
     bandwidths = [10, 100]
 
     for mbps in bandwidths:
         for algo in algos:
             # start API and containernet
             net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
+            #net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
             api.start()
             net.start()
 
             # allocate servers (Sonata DC construct) to place chains
             # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
-            allocs = get_placement(pn_fname, vn_fname, algo)  # netsolver
+            allocs = get_placement(pn_fname, vn_fname, algo)  # daisy
             # allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
             # allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
             num_of_chains = 0
