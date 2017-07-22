@@ -600,9 +600,6 @@ def start_benchmark(algo, chain_index, mbps):
 
     # list of commands to execute one-by-one
     cmds = []
-    glog.info('> sleeping 10s to let tunnel interfaces initialize...')
-    time.sleep(10)
-    glog.info('< 5s wait complete')
     glog.info('Starting measurements')    # copy traces to the source VNF
     cmds.append('sudo docker cp ../traces/output.pcap mn.chain%d-source:/' % chain_index)
 

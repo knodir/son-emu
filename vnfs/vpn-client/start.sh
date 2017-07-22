@@ -13,12 +13,10 @@ iptables -A FORWARD -i output -o input-ids -m state --state RELATED,ESTABLISHED 
 iptables -A FORWARD -i input-ids -o output -j ACCEPT
 echo "iptables configuration complete"
 
-sleep 2
-
 echo "starting openvpn to the server..."
-sudo openvpn client.ovpn &
-echo "sleep 30s to let openvpn finish config"
-sleep 30
+sudo openvpn client.ovpn --replay-window 64 20 &
+echo "sleep 5s to let openvpn finish config"
+sleep 5
 echo "execute ifconfig to see interface"
 ifconfig
 echo "execute route -n to see routing table"

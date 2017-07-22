@@ -400,7 +400,7 @@ def allocate_chains(dcs, allocs):
                 # node-upgrade experiment requires knodir/sonata-fw-vnf:upgrade
                 # image as it has an additional interface for ids2.
                 vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                        image='knodir/sonata-fw-vnf:alloc', flavor_name="fw",
+                                                        image='knodir/sonata-fw-fixed', flavor_name="fw",
                                                         network=[{'id': 'input', 'ip': '10.0.1.5/24'},
                                                                  {'id': 'output-ids', 'ip': '10.0.1.61/24'},
                                                                  {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
@@ -456,11 +456,13 @@ def plumb_chains(net, vnfs, num_of_chains):
 
     # execute /start.sh script inside all firewalls. It starts Ryu
     # controller and OVS with proper configuration.
+    vnf_index = 0
     for vnf_name_and_obj in vnfs['fw']:
         vnf_name = vnf_name_and_obj.keys()[0]
-        cmd = 'sudo docker exec -i mn.%s /bin/bash /root/start.sh &' % vnf_name
+        cmd = 'sudo docker exec mn.%s /root/start.sh %s &' % (vnf_name, vnf_index)
         execStatus = subprocess.call(cmd, shell=True)
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
+        vnf_index = vnf_index + 1
 
     # glog.info('> sleeping 10s to let ryu controller initialize properly')
     # time.sleep(10)
@@ -483,9 +485,9 @@ def plumb_chains(net, vnfs, num_of_chains):
         execStatus = subprocess.call(cmd, shell=True)
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
 
-    glog.info('> sleeping 120s to let fw, ids, nat initialize properly...')
-    time.sleep(120)
-    glog.info('< 120s wait complete')
+    glog.info('> sleeping 5s to let fw, ids, nat initialize properly...')
+    time.sleep(5)
+    glog.info('< 5s wait complete')
     glog.info('start VNF chaining')
 
     # chain 'client <-> nat <-> fw <-> ids <-> vpn <-> server'
@@ -551,9 +553,9 @@ def plumb_chains(net, vnfs, num_of_chains):
         glog.info('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
-    glog.info('> sleeping 180s to let VPN client initialize...')
-    time.sleep(180)
-    glog.info('< 180s wait complete')
+    glog.info('> sleeping 5s to let VPN client initialize...')
+    time.sleep(5)
+    glog.info('< 5s wait complete')
     glog.info('VPN client VNF started')
 
     for vnf_name_and_obj in vnfs['nat']:
@@ -595,7 +597,7 @@ def plumb_chains(net, vnfs, num_of_chains):
                   src_vnf_name, dst_vnf_name, ping_res)
 
 
-def benchmark(self, algo, line, mbps):
+def benchmark(algo, line, mbps):
     """ Allocate E2 style chains. """
 
     # list of commands to execute one-by-one
@@ -630,8 +632,7 @@ def benchmark(self, algo, line, mbps):
 
     for chain_index in range(num_of_chains):
         # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
-        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=' +
-                    mbps + ' -d 1 --intf1=intf1 /output.pcap" &' % chain_index)
+        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (chain_index, mbps))
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -660,8 +661,8 @@ def benchmark(self, algo, line, mbps):
 
     # copy .csv results from VNF to the host
     for chain_index in range(num_of_chains):
-        cmds.append('sudo docker cp mn.chain%d-sink:/tmp/dstat.csv ./results/allocation/' + algo + str(mbps) +
-                    'e2-allocate-from-chain%d-sink.csv' % (chain_index, chain_index))
+        cmds.append('sudo docker cp mn.chain%s-sink:/tmp/dstat.csv ./results/allocation/%s%se2-allocate-from-chain%s-sink.csv' %
+                    (str(chain_index), algo, str(mbps), str(chain_index)))
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -683,9 +684,6 @@ def benchmark(self, algo, line, mbps):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
-    # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
-    # e2-nss-1rack-8servers
-    # pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
     # net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
 
     # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
@@ -699,9 +697,13 @@ if __name__ == '__main__':
     # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
     # max_cu_net = 600 => 10 dc_cu x 60 physical cores
 
+    # e2-nss-1rack-8servers
+    pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
+    vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
+
     # e2-azure-1rack-50servers
-    vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
-    pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
+    # vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
+    # pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
     algos = ['netsolver', 'random', 'packing']
     bandwidths = [10, 100]
 

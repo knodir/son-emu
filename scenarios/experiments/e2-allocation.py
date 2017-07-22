@@ -400,7 +400,7 @@ def allocate_chains(dcs, allocs):
                 # node-upgrade experiment requires knodir/sonata-fw-vnf:upgrade
                 # image as it has an additional interface for ids2.
                 vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                        image='knodir/sonata-fw-vnf:alloc', flavor_name="fw",
+                                                        image='knodir/sonata-fw-fixed', flavor_name="fw",
                                                         network=[{'id': 'input', 'ip': '10.0.1.5/24'},
                                                                  {'id': 'output-ids', 'ip': '10.0.1.61/24'},
                                                                  {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
@@ -456,11 +456,13 @@ def plumb_chains(net, vnfs, num_of_chains):
 
     # execute /start.sh script inside all firewalls. It starts Ryu
     # controller and OVS with proper configuration.
+    vnf_index = 0
     for vnf_name_and_obj in vnfs['fw']:
         vnf_name = vnf_name_and_obj.keys()[0]
-        cmd = 'sudo docker exec -i mn.%s /bin/bash /root/start.sh &' % vnf_name
+        cmd = 'sudo docker exec mn.%s /root/start.sh %s &' % (vnf_name, vnf_index)
         execStatus = subprocess.call(cmd, shell=True)
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
+        vnf_index = vnf_index + 1
 
     # glog.info('> sleeping 10s to let ryu controller initialize properly')
     # time.sleep(10)
