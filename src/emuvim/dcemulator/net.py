@@ -818,6 +818,7 @@ class DCNetwork(Containernet):
             flow['actions'].append(action)
 
         flow['match'] = self._parse_match(match)
+        print(flow)
         self.ryu_REST(prefix, data=flow)
 
     def _set_vlan_tag(self, node, switch_port, tag):

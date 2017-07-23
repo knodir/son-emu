@@ -6,15 +6,11 @@ from emuvim.dcemulator.net import DCNetwork
 from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
 from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM
 from emuvim.dcemulator.resourcemodel import ResourceModelRegistrar
+import os
 
 import thread
-from mininet.log import setLogLevel, info
 from mininet.node import RemoteController
 from mininet.clean import cleanup
-from mininet.net import Containernet
-from mininet.node import Controller, Docker, OVSSwitch
-from mininet.cli import CLI
-from mininet.link import TCLink, Link
 
 
 def prepareDC():
@@ -63,21 +59,20 @@ def prepareDC():
     # Sonata VM OOM killer starts killing random processes.
 
     net = DCNetwork(controller=RemoteController, monitor=True,
-                    dc_emulation_max_cpu=MAX_CU, dc_emulation_max_mem=MAX_MU,
-                    enable_learning=True)
+                    enable_learning=False)
 
-    reg = ResourceModelRegistrar(MAX_CU, MAX_MU)
-    rm = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
-    reg.register("homogeneous_rm", rm)
+    # reg = ResourceModelRegistrar(MAX_CU, MAX_MU)
+    # rm = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    # reg.register("homogeneous_rm", rm)
 
     # add 3 servers
     off_cloud = net.addDatacenter('off-cloud')  # place client/server VNFs
     chain_server1 = net.addDatacenter('chain-server1')
     chain_server2 = net.addDatacenter('chain-server2')
 
-    off_cloud.assignResourceModel(rm)
-    chain_server1.assignResourceModel(rm)
-    chain_server2.assignResourceModel(rm)
+    # off_cloud.assignResourceModel(rm)
+    # chain_server1.assignResourceModel(rm)
+    # chain_server2.assignResourceModel(rm)
 
     # connect data centers with switches
     tor1 = net.addSwitch('tor1')
@@ -116,19 +111,16 @@ def nodeUpgrade():
 
     # create client with one interface
     client = off_cloud.startCompute("client", image='knodir/client',
-                                    flavor_name=fl,
                                     network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
     # create NAT VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     nat = cs1.startCompute("nat", image='knodir/nat',
-                           flavor_name=fl,
                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
                                     {'id': 'output', 'ip': '10.0.1.4/24'}])
     # create fw VNF with two interfaces. 'input' interface for 'client' and
     # 'output' interface for the 'ids' VNF. Both interfaces are bridged to
     # ovs1 bridge. knodir/sonata-fw-vnf has OVS and Ryu controller.
-    fw = cs1.startCompute("fw", image='knodir/sonata-fw-vnf',
-                          flavor_name="xlarge",
+    fw = cs1.startCompute("fw", image='knodir/sonata-fw-fixed2',
                           network=[{'id': 'input', 'ip': '10.0.1.5/24'},
                                    {'id': 'output-ids1', 'ip': '10.0.1.60/24'},
                                    {'id': 'output-ids2', 'ip': '10.0.1.61/24'},
@@ -136,18 +128,15 @@ def nodeUpgrade():
     # create ids VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
     ids1 = cs1.startCompute("ids1", image='knodir/snort-trusty',
-                            flavor_name=fl,
                             network=[{'id': 'input', 'ip': '10.0.1.70/24'},
                                      {'id': 'output', 'ip': '10.0.1.80/24'}])
     ids2 = cs1.startCompute("ids2", image='knodir/snort-xenial',
-                            flavor_name=fl,
                             network=[{'id': 'input', 'ip': '10.0.1.71/24'},
                                      {'id': 'output', 'ip': '10.0.1.81/24'}])
 
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     vpn = cs1.startCompute("vpn", image='knodir/vpn-client',
-                           flavor_name=fl,
                            network=[{'id': 'input-ids1', 'ip': '10.0.1.90/24'},
                                     {'id': 'input-ids2', 'ip': '10.0.1.91/24'},
                                     {'id': 'input-fw', 'ip': '10.0.1.92/24'},
@@ -159,7 +148,6 @@ def nodeUpgrade():
     # address. So, if you change this address make sure it is changed inside
     # client.ovpn file as well as subprocess mn.vpn route injection call below.
     server = off_cloud.startCompute("server", image='knodir/vpn-server',
-                                    flavor_name="small",
                                     network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
 
     # net.stop()
@@ -257,6 +245,9 @@ def nodeUpgrade():
 
     print('ping client -> server after explicit chaining. Packet drop %s%%' %
           net.ping([client, server], timeout=5))
+    os.system('sudo docker cp ../traces/output.pcap mn.client:/')
+    os.system('sudo docker cp ../traces/ftp.ready.pcap mn.client:/')
+    return net
 
 
 def clean_stale(cmds):
@@ -289,7 +280,7 @@ def clean_stale(cmds):
     return cmds
 
 
-def clean_and_save(cmds, testName):
+def clean_and_save(cmds, multiplier):
 
     cmds.append('sudo docker exec -i mn.client /bin/bash -c "pkill tcpreplay"')
 
@@ -302,10 +293,15 @@ def clean_and_save(cmds, testName):
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "pkill python2"')
     # copy the iperf client output file to the local machine
     # cmds.append('sudo docker cp mn.client:/tmp/iperf3.json ./output/from-client.json')
-    cmds.append('sudo docker cp mn.client:/tmp/dstat.csv ./results/' + testName + '-from-client.csv')
-    cmds.append('sudo docker cp mn.ids1:/tmp/dstat.csv ./results/' + testName + '-from-ids1.csv')
-    cmds.append('sudo docker cp mn.ids2:/tmp/dstat.csv ./results/' + testName + '-from-ids2.csv')
-    cmds.append('sudo docker cp mn.vpn:/tmp/dstat.csv ./results/' + testName + '-from-vpn.csv')
+    cmds.append('rm -rf ./results/upgrade' + str(multiplier / 10**6) + '*.csv')
+    cmds.append('sudo docker cp mn.client:/tmp/dstat.csv ./results/upgrade' +
+                str(multiplier / 10**6) + '-from-client.csv')
+    cmds.append('sudo docker cp mn.ids1:/tmp/dstat.csv ./results/upgrade' +
+                str(multiplier / 10**6) + '-from-ids1.csv')
+    cmds.append('sudo docker cp mn.ids2:/tmp/dstat.csv ./results/upgrade' +
+                str(multiplier / 10**6) + '-from-ids2.csv')
+    cmds.append('sudo docker cp mn.vpn:/tmp/dstat.csv ./results/upgrade' +
+                str(multiplier / 10**6) + '-from-vpn.csv')
     # do remaining cleanup inside containers
     # cmds.append('sudo docker exec -i mn.server /bin/bash -c "pkill iperf3"')
 
@@ -321,16 +317,16 @@ def clean_and_save(cmds, testName):
 def switch_ids():
     """ Switch IDS1 with IDS2. """
 
-    print('switch_ids() activated, waiting 10s before trigger')
-    time.sleep(20)
+    print('switch_ids() activated, waiting 50s before trigger')
+    time.sleep(50)
     print('switch_ids() wait complete. Trigger the IDS switch.')
 
     cmds = []
 
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs1 in_port=1,out_port=2"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs1 in_port=2,out_port=1"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs1 priority=2,in_port=1,action=output:3"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs1 priority=2,in_port=3,action=output:1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=1,out_port=2"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=2,out_port=1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=1,action=output:3"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=3,action=output:1"')
     # little hack to enforce immediate impact of the new OVS rule
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ip link set output-ids1 down && ip link set output-ids1 up"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route del -net 10.0.1.0/24 dev input-ids1"')
@@ -345,6 +341,7 @@ def switch_ids():
     #print('> sleeping 60s to VPN client initialize...')
     # time.sleep(60)
     #print('< wait complete')
+    return net
 
 
 def switch_ids_back():
@@ -369,12 +366,11 @@ def switch_ids_back():
     cmds[:] = []
 
 
-def benchmark(line, mbps):
+def benchmark(multiplier):
     """ Start traffic generation. """
 
     # list of commands to execute one-by-one
     cmds = []
-    multiplier = 10**7
     # clean stale programs and remove old files
     cmds = clean_stale(cmds)
 
@@ -384,7 +380,7 @@ def benchmark(line, mbps):
     cmds.append('sudo docker exec -i mn.ids2 /bin/bash -c "dstat --net --time -N input --bits --output /tmp/dstat.csv" &')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "dstat --net --time -N input-fw --bits --output /tmp/dstat.csv" &')
     # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
-    cmds.append('sudo docker exec -i mn.client /bin/bash -c "tcpreplay --loop=100 --mbps=' +
+    cmds.append('sudo timeout 123 docker exec -i mn.client /bin/bash -c "tcpreplay --loop=0 --mbps=' +
                 str(multiplier / 10**6) + ' -d 1 --intf1=intf1 /ftp.ready.pcap" &')
 
     for cmd in cmds:
@@ -402,20 +398,36 @@ def benchmark(line, mbps):
     # start iperf client or replay enterprise traces
     # cmd = 'sudo docker exec -i mn.client /bin/bash -c "iperf3 -c 10.8.0.1 -t 60 -b 10M --no-delay --omit 0 --json --logfile /tmp/iperf3.json"'
     # each loop is around 40s for 10 Mbps speed, 2 loops easily make 1m
-    cmd = 'sudo docker exec -i mn.client /bin/bash -c "tcpreplay --loop=2 --mbps=' + \
-        str(multiplier / 10**6) + ' -d 1 --intf1=intf1 /output.pcap"'
+    cmd = 'sudo timeout 120 docker exec -i mn.client /bin/bash -c "tcpreplay --loop=0 --mbps=' + \
+        str(multiplier / 10**6) + ' -d 1 --intf1=intf1 /output.pcap" &'
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from %s (0 is success)' % (execStatus, cmd))
-
+    print("Wait 70 seconds for the test to complete")
+    time.sleep(70)
     # clean and save the results in csv file named after the test
-    cmds = clean_and_save(cmds, "upgrade")
-
+    cmds = clean_and_save(cmds, multiplier)
+    cmds.append('sudo killall dstat')
+    cmds.append('sudo killall tcpreplay')
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
     print('done')
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    # logging.basicConfig(level=logging.INFO)
 
-    nodeUpgrade()
+    net = nodeUpgrade()
+    print("Done with scaleout!")
+    print('Running 10 Mbps')
+    benchmark(10**7)
+    print('Running 100 Mbps')
+    benchmark(10**8)
+    print('Running 1000 Mbps')
+    benchmark(10**9)
+    print('Running 10000 Mbps')
+    benchmark(10**10)
     net.CLI()
     net.stop()
     cleanup()
+    os.system("sudo ../clean-stale.sh")

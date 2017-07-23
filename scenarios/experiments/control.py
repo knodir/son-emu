@@ -3,7 +3,6 @@
 from time import sleep
 import subprocess
 import cmd
-import threading
 import thread
 import os
 

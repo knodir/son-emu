@@ -53,12 +53,13 @@ def extract_dstat(fname, pos, omit_sec, duration):
     return bw
 
 
-def plot_upgrade():
+def plot_upgrade(mbps):
     # amount of seconds to skip data collection, and duration of the experiment
-    omit_sec, duration = 3, 60
+    omit_sec, duration = 3, 74
     # for client we monitor TX traffic, which is the value on the 2nd position
     # of the CSV file.
-    client_bw = extract_dstat('./results/upgrade-from-client.csv', 2, omit_sec,
+    client_bw = extract_dstat('./results/upgrade' +
+                              str(mbps) + '-from-client.csv', 2, omit_sec,
                               duration)
     print('client_bw = %s, len = %d' % (client_bw, len(client_bw)))
 
@@ -76,8 +77,8 @@ def plot_upgrade():
                            duration)
     print('vpn_bw = %s, len = %d' % (vpn_bw, len(vpn_bw)))
 
-    figure_name = 'results/upgrade.png'
-    t = np.arange(0.0, 60, 1)
+    figure_name = 'results/upgrade' + str(mbps) + '.png'
+    t = np.arange(0.0, 74, 1)
 
     # Plots the figure
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -99,7 +100,7 @@ def plot_upgrade():
 
 def plot_scaleout(mbps):
     # amount of seconds to skip data collection, and duration of the experiment
-    omit_sec, duration = 3, 60
+    omit_sec, duration = 3, 67
     # for client we monitor TX traffic, which is the value on the 2nd position
     # of the CSV file.
     client_bw = extract_dstat('./results/scaleout' +
@@ -120,7 +121,7 @@ def plot_scaleout(mbps):
     print('vpn_bw = %s, len = %d' % (vpn_bw, len(vpn_bw)))
 
     figure_name = 'results/scaleout' + str(mbps) + '.png'
-    t = np.arange(0.0, 60, 1)
+    t = np.arange(0.0, 67, 1)
 
     # Plots the figure
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -362,7 +363,10 @@ def plot_allocate10():
 
 
 if __name__ == '__main__':
-    plot_upgrade()
+    plot_upgrade(10)
+    plot_upgrade(100)
+    plot_upgrade(1000)
+    plot_upgrade(10000)
     plot_scaleout(10)
     plot_scaleout(100)
     plot_scaleout(1000)

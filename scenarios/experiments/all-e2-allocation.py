@@ -62,7 +62,9 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     # Sonata VM OOM killer starts killing random processes.
 
     net = DCNetwork(controller=RemoteController, monitor=True,
-                    enable_learning=False)
+                    dc_emulation_max_cpu=max_cu_net,
+                    dc_emulation_max_mem=max_mu_net,
+                    enable_learning=True)
 
     # Read physical topology from file.
     with open(pn_fname) as data_file:
@@ -709,8 +711,8 @@ if __name__ == '__main__':
     for mbps in bandwidths:
         for algo in algos:
             # start API and containernet
-            net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
-            #net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
+            net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 1000, 417792)
+            # net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
             api.start()
             net.start()
 
