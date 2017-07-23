@@ -64,7 +64,7 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     net = DCNetwork(controller=RemoteController, monitor=True,
                     dc_emulation_max_cpu=max_cu_net,
                     dc_emulation_max_mem=max_mu_net,
-                    enable_learning=True)
+                    enable_learning=False)
 
     # Read physical topology from file.
     with open(pn_fname) as data_file:
@@ -102,24 +102,23 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
         # tors list.
         if (pn_item[0] not in data['Servers'].keys()) and (
                 pn_item[0] not in tors.keys()):
-            # glog.info(pn_item[0])
+            glog.info(pn_item[0])
             tors[pn_item[0]] = None
 
         # same comment as above, but for the second item
         if (pn_item[1] not in data['Servers'].keys()) and (
                 pn_item[1] not in tors.keys()):
-            # glog.info(pn_item[1])
+            glog.info(pn_item[1])
             tors[pn_item[1]] = None
 
     # connect ToR switches and DC per PN topology
     for tor_name in tors.keys():
         tors[tor_name] = net.addSwitch(tor_name)
-
     glog.info('ToR switch name and objects: %s' % tors)
 
     for pn_item in data['PN']:
         net.addLink(dcs[pn_item[0]], tors[pn_item[1]])
-
+        #os.system('sudo ovs-vsctl set Bridge'+ dcs[pn_item[0]].name+' rstp_enable=true')
     glog.info('added link from DCs to ToR')
 
     # create REST API endpoint
@@ -445,48 +444,6 @@ def allocate_chains(dcs, allocs, chain_index):
 
 
 def plumb_chains(net, vnfs, num_of_chains, chain_index):
-    # vnfs have the following format:
-    # {fw: [{chain0_fw: obj}, {chain1_fw: obj}, ...],
-    #  nat: [{chain0_nat: obj}, {chain1_nat: obj}, ...],
-    #  ...}
-    #glog.info('> sleeping 30s to identify fw as culprit...')
-    #time.sleep(30)
-    # execute /start.sh script inside all firewalls. It starts Ryu
-    # controller and OVS with proper configuration.
-    for vnf_name_and_obj in vnfs['fw']:
-        vnf_name = vnf_name_and_obj.keys()[0]
-        cmd = 'sudo docker exec mn.%s /root/start.sh %s &' % (vnf_name, chain_index)
-        execStatus = subprocess.call(cmd, shell=True)
-        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
-    glog.info('> sleeping 10s to check if everything is going well...')
-
-    time.sleep(10)    
-    glog.info('Done with sleeping, time for business')
-    # glog.info('> sleeping 10s to let ryu controller initialize properly')
-    # time.sleep(10)
-    # glog.info('< wait complete')
-    # glog.info('fw start done')
-
-    # execute /start.sh script inside ids image. It bridges input and output
-    # interfaces with br0, and starts ids process listering on br0.
-    for vnf_name_and_obj in vnfs['ids']:
-        vnf_name = vnf_name_and_obj.keys()[0]
-        cmd = 'sudo docker exec -i mn.%s /bin/bash -c "sh /start.sh"' % vnf_name
-        execStatus = subprocess.call(cmd, shell=True)
-        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
-
-    # execute /start.sh script inside nat image. It attaches both input
-    # and output interfaces to OVS bridge to enable packet forwarding.
-    for vnf_name_and_obj in vnfs['nat']:
-        vnf_name = vnf_name_and_obj.keys()[0]
-        cmd = 'sudo docker exec -i mn.%s /bin/bash /start.sh' % vnf_name
-        execStatus = subprocess.call(cmd, shell=True)
-        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
-
-    glog.info('> sleeping 5s to let fw, ids, nat initialize properly...')
-    time.sleep(5)
-    glog.info('< 5s wait complete')
-    glog.info('start VNF chaining')
 
     # chain 'client <-> nat <-> fw <-> ids <-> vpn <-> server'
     for chain_index in range(num_of_chains):
@@ -526,7 +483,49 @@ def plumb_chains(net, vnfs, num_of_chains, chain_index):
                            bidirectional=True, cmd='add-flow')
         glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
+    # vnfs have the following format:
+    # {fw: [{chain0_fw: obj}, {chain1_fw: obj}, ...],
+    #  nat: [{chain0_nat: obj}, {chain1_nat: obj}, ...],
+    #  ...}
+    glog.info('> sleeping 30s to identify fw as culprit...')
+    time.sleep(30)
+    # execute /start.sh script inside all firewalls. It starts Ryu
+    # controller and OVS with proper configuration.
+    for vnf_name_and_obj in vnfs['fw']:
+        vnf_name = vnf_name_and_obj.keys()[0]
+        cmd = 'sudo docker exec mn.%s /root/start.sh %s &' % (vnf_name, chain_index)
+        execStatus = subprocess.call(cmd, shell=True)
+        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
+    glog.info('> sleeping 10s to check if everything is going well...')
+
+    time.sleep(10)    
+    glog.info('Done with sleeping, time for business')
+    # glog.info('> sleeping 10s to let ryu controller initialize properly')
+    # time.sleep(10)
+    # glog.info('< wait complete')
+    # glog.info('fw start done')
     cmds = []
+
+    # execute /start.sh script inside ids image. It bridges input and output
+    # interfaces with br0, and starts ids process listering on br0.
+    for vnf_name_and_obj in vnfs['ids']:
+        vnf_name = vnf_name_and_obj.keys()[0]
+        cmd = 'sudo docker exec -i mn.%s /bin/bash -c "sh /start.sh"' % vnf_name
+        execStatus = subprocess.call(cmd, shell=True)
+        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
+
+    # execute /start.sh script inside nat image. It attaches both input
+    # and output interfaces to OVS bridge to enable packet forwarding.
+    for vnf_name_and_obj in vnfs['nat']:
+        vnf_name = vnf_name_and_obj.keys()[0]
+        cmd = 'sudo docker exec -i mn.%s /bin/bash /start.sh' % vnf_name
+        execStatus = subprocess.call(cmd, shell=True)
+        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
+
+    glog.info('> sleeping 5s to let fw, ids, nat initialize properly...')
+    time.sleep(5)
+    glog.info('< 5s wait complete')
+    glog.info('start VNF chaining')
 
     for vnf_name_and_obj in vnfs['sink']:
         vnf_name = vnf_name_and_obj.keys()[0]
@@ -552,7 +551,7 @@ def plumb_chains(net, vnfs, num_of_chains, chain_index):
     cmds[:] = []
 
     glog.info('> sleeping 5s to let VPN client initialize...')
-    time.sleep(5)
+    time.sleep(15)
     glog.info('< 5s wait complete')
     glog.info('VPN client VNF started')
 
@@ -567,7 +566,7 @@ def plumb_chains(net, vnfs, num_of_chains, chain_index):
         vnf_name = vnf_name_and_obj.keys()[0]
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids"' % vnf_name)
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ip route del 10.0.10.10/32"' % vnf_name)
-
+	cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route del -net 10.0.1.0/24 input-ids"' % vnf_name)
     for vnf_name_and_obj in vnfs['source']:
         vnf_name = vnf_name_and_obj.keys()[0]
         # rewrite client VNF MAC addresses for tcpreplay
