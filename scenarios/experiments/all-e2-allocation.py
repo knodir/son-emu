@@ -62,9 +62,7 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     # Sonata VM OOM killer starts killing random processes.
 
     net = DCNetwork(controller=RemoteController, monitor=True,
-                    dc_emulation_max_cpu=max_cu_net,
-                    dc_emulation_max_mem=max_mu_net,
-                    enable_learning=True)
+                    enable_learning=False)
 
     # Read physical topology from file.
     with open(pn_fname) as data_file:

@@ -97,26 +97,29 @@ def plot_upgrade():
     plt.close(fig)
 
 
-def plot_scaleout():
+def plot_scaleout(mbps):
     # amount of seconds to skip data collection, and duration of the experiment
     omit_sec, duration = 3, 60
     # for client we monitor TX traffic, which is the value on the 2nd position
     # of the CSV file.
-    client_bw = extract_dstat('./results/scaleout-from-client.csv', 2, omit_sec,
+    client_bw = extract_dstat('./results/scaleout' +
+                              str(mbps) + '-from-client.csv', 2, omit_sec,
                               duration)
     print('client_bw = %s, len = %d' % (client_bw, len(client_bw)))
 
     # for all other VNFs we monitor RX traffic, which is the value on the 1st
     # position of the CSV file.
-    ids1_bw = extract_dstat('./results/scaleout-from-ids1.csv', 2, omit_sec,
+    ids1_bw = extract_dstat('./results/scaleout' +
+                            str(mbps) + '-from-ids1.csv', 2, omit_sec,
                             duration)
     print('ids1_bw = %s, len = %d' % (ids1_bw, len(ids1_bw)))
 
-    vpn_bw = extract_dstat('./results/scaleout-from-vpn.csv', 2, omit_sec,
+    vpn_bw = extract_dstat('./results/scaleout' +
+                           str(mbps) + '-from-vpn.csv', 2, omit_sec,
                            duration)
     print('vpn_bw = %s, len = %d' % (vpn_bw, len(vpn_bw)))
 
-    figure_name = 'results/scaleout.png'
+    figure_name = 'results/scaleout' + str(mbps) + '.png'
     t = np.arange(0.0, 60, 1)
 
     # Plots the figure
@@ -124,7 +127,7 @@ def plot_scaleout():
     axes = plt.gca()
     plt.xlabel('Time (s)')
     plt.ylabel('Bandwidth (Mbps)')
-    plt.ylim([0, 10])
+    plt.ylim([0, mbps])
     client = plt.plot(t, client_bw, 'r--', label='Client')
     ids1 = plt.plot(t, ids1_bw, 'g--', label='IDS1')
     vpn = plt.plot(t, vpn_bw, 'k--', label='VPN')
@@ -357,8 +360,12 @@ def plot_allocate10():
               ['random', 'packing', 'daisy'], bw_range, allocs_range)
     # vdc_names, bw_range, allocs_range)
 
+
 if __name__ == '__main__':
-    # plot_upgrade()
-    # plot_scaleout()
+    plot_upgrade()
+    plot_scaleout(10)
+    plot_scaleout(100)
+    plot_scaleout(1000)
+    plot_scaleout(10000)
     plot_allocate10()
     plot_allocate100()

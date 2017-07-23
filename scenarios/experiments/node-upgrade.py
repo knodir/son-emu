@@ -258,9 +258,6 @@ def nodeUpgrade():
     print('ping client -> server after explicit chaining. Packet drop %s%%' %
           net.ping([client, server], timeout=5))
 
-    net.CLI()
-    net.stop()
-
 
 def clean_stale(cmds):
 
@@ -419,4 +416,6 @@ if __name__ == '__main__':
     # logging.basicConfig(level=logging.INFO)
 
     nodeUpgrade()
+    net.CLI()
+    net.stop()
     cleanup()
