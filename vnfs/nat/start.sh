@@ -5,6 +5,7 @@ echo "Setting up NAT VNF"
 echo "configuring IPv4 and ARP forwarding ..."
 echo 1 > /proc/sys/net/ipv4/ip_forward
 echo 1 > /proc/sys/net/ipv4/conf/all/proxy_arp
+sysctl -p /etc/sysctl.conf
 echo "forwarding configuration complete"
 
 echo "configuring iptables ..."

@@ -53,12 +53,13 @@ def extract_dstat(fname, pos, omit_sec, duration):
     return bw
 
 
-def plot_upgrade():
+def plot_upgrade(mbps):
     # amount of seconds to skip data collection, and duration of the experiment
-    omit_sec, duration = 3, 60
+    omit_sec, duration = 3, 74
     # for client we monitor TX traffic, which is the value on the 2nd position
     # of the CSV file.
-    client_bw = extract_dstat('./results/upgrade-from-client.csv', 2, omit_sec,
+    client_bw = extract_dstat('./results/upgrade' +
+                              str(mbps) + '-from-client.csv', 2, omit_sec,
                               duration)
     print('client_bw = %s, len = %d' % (client_bw, len(client_bw)))
 
@@ -76,8 +77,8 @@ def plot_upgrade():
                            duration)
     print('vpn_bw = %s, len = %d' % (vpn_bw, len(vpn_bw)))
 
-    figure_name = 'results/upgrade.png'
-    t = np.arange(0.0, 60, 1)
+    figure_name = 'results/upgrade' + str(mbps) + '.png'
+    t = np.arange(0.0, 74, 1)
 
     # Plots the figure
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -97,34 +98,37 @@ def plot_upgrade():
     plt.close(fig)
 
 
-def plot_scaleout():
+def plot_scaleout(mbps):
     # amount of seconds to skip data collection, and duration of the experiment
-    omit_sec, duration = 3, 60
+    omit_sec, duration = 3, 67
     # for client we monitor TX traffic, which is the value on the 2nd position
     # of the CSV file.
-    client_bw = extract_dstat('./results/scaleout-from-client.csv', 2, omit_sec,
+    client_bw = extract_dstat('./results/scaleout' +
+                              str(mbps) + '-from-client.csv', 2, omit_sec,
                               duration)
     print('client_bw = %s, len = %d' % (client_bw, len(client_bw)))
 
     # for all other VNFs we monitor RX traffic, which is the value on the 1st
     # position of the CSV file.
-    ids1_bw = extract_dstat('./results/scaleout-from-ids1.csv', 2, omit_sec,
+    ids1_bw = extract_dstat('./results/scaleout' +
+                            str(mbps) + '-from-ids1.csv', 2, omit_sec,
                             duration)
     print('ids1_bw = %s, len = %d' % (ids1_bw, len(ids1_bw)))
 
-    vpn_bw = extract_dstat('./results/scaleout-from-vpn.csv', 2, omit_sec,
+    vpn_bw = extract_dstat('./results/scaleout' +
+                           str(mbps) + '-from-vpn.csv', 2, omit_sec,
                            duration)
     print('vpn_bw = %s, len = %d' % (vpn_bw, len(vpn_bw)))
 
-    figure_name = 'results/scaleout.png'
-    t = np.arange(0.0, 60, 1)
+    figure_name = 'results/scaleout' + str(mbps) + '.png'
+    t = np.arange(0.0, 67, 1)
 
     # Plots the figure
     fig, ax = plt.subplots(figsize=(8, 4))
     axes = plt.gca()
     plt.xlabel('Time (s)')
     plt.ylabel('Bandwidth (Mbps)')
-    plt.ylim([0, 10])
+    plt.ylim([0, mbps])
     client = plt.plot(t, client_bw, 'r--', label='Client')
     ids1 = plt.plot(t, ids1_bw, 'g--', label='IDS1')
     vpn = plt.plot(t, vpn_bw, 'k--', label='VPN')
@@ -234,7 +238,7 @@ def plot_allocate100():
     # algo_bw_files = {'random': [], 'packing': [], 'daisy': []}
     algo_bw_files = {'random100': [], 'packing100': [], 'daisy100': []}
 
-    base_path = './results/allocate'
+    base_path = './results/allocation'
 
     # algos = ['random', 'packing', 'daisy']
     # algos = ['random', 'packing']
@@ -291,7 +295,7 @@ def plot_allocate100():
     # vdc_names, bw_range, allocs_range)
 
 
-def plot_allocate():
+def plot_allocate10():
     # amount of seconds to skip data collection, and duration of the experiment
     omit_sec, duration = 10, 60
     # list of average bandwidth amount each chain gets
@@ -299,14 +303,14 @@ def plot_allocate():
     total_bw = {}
     total_allocs = {}
     # algo_bw_files = {'random': [], 'packing': [], 'daisy': []}
-    algo_bw_files = {'random': [], 'packing': [], 'daisy': []}
+    algo_bw_files = {'random10': [], 'packing10': [], 'daisy10': []}
 
-    base_path = './results/allocate'
+    base_path = './results/allocation'
 
     # algos = ['random', 'packing', 'daisy']
     # algos = ['random', 'packing']
     # algos = ['random']
-    algos = ['random', 'packing', 'daisy']
+    algos = ['random10', 'packing10', 'daisy10']
 
     for algo in algos:
         folder_name = '%s/%s' % (base_path, algo)
@@ -339,13 +343,13 @@ def plot_allocate():
 
     plot_file_name = 'results/allocate.png'
 
-    random_bw = total_bw['random']
-    packing_bw = total_bw['packing']
-    daisy_bw = total_bw['daisy']  # daisy']
+    random_bw = total_bw['random10']
+    packing_bw = total_bw['packing10']
+    daisy_bw = total_bw['daisy10']  # daisy']
 
-    random_allocs = total_allocs['random']
-    packing_allocs = total_allocs['packing']
-    daisy_allocs = total_allocs['daisy']  # daisy']
+    random_allocs = total_allocs['random10']
+    packing_allocs = total_allocs['packing10']
+    daisy_allocs = total_allocs['daisy10']  # daisy']
 
     vdc_names = algos
     bw_range = [0, 100]
@@ -357,8 +361,15 @@ def plot_allocate():
               ['random', 'packing', 'daisy'], bw_range, allocs_range)
     # vdc_names, bw_range, allocs_range)
 
+
 if __name__ == '__main__':
-    # plot_upgrade()
-    # plot_scaleout()
-    plot_allocate()
+    plot_upgrade(10)
+    plot_upgrade(100)
+    plot_upgrade(1000)
+    plot_upgrade(10000)
+    plot_scaleout(10)
+    plot_scaleout(100)
+    plot_scaleout(1000)
+    plot_scaleout(10000)
+    plot_allocate10()
     plot_allocate100()

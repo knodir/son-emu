@@ -509,6 +509,7 @@ class DCNetwork(Containernet):
                 if self.controller == RemoteController and insert_flow:
                     ## set flow entry via ryu rest api
                     self._set_flow_entry_ryu_rest(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
+                    # self._set_flow_entry_dpctl(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
                     break
                 elif insert_flow:
                     ## set flow entry via ovs-ofctl
@@ -818,6 +819,7 @@ class DCNetwork(Containernet):
             flow['actions'].append(action)
 
         flow['match'] = self._parse_match(match)
+        print(flow)
         self.ryu_REST(prefix, data=flow)
 
     def _set_vlan_tag(self, node, switch_port, tag):
