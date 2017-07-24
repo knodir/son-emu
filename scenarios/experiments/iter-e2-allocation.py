@@ -12,6 +12,7 @@ from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
 from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM
 
 from mininet.node import RemoteController
+from mininet.node import DefaultController
 from mininet.clean import cleanup
 
 
@@ -61,7 +62,7 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     # because of the contention between OVS and cgroup mem limitation) and
     # Sonata VM OOM killer starts killing random processes.
 
-    net = DCNetwork(controller=RemoteController, monitor=True,
+    net = DCNetwork(controller=DefaultController, monitor=True,
                     dc_emulation_max_cpu=max_cu_net,
                     dc_emulation_max_mem=max_mu_net,
                     enable_learning=False)
@@ -118,7 +119,6 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
 
     for pn_item in data['PN']:
         net.addLink(dcs[pn_item[0]], tors[pn_item[1]])
-        #os.system('sudo ovs-vsctl set Bridge'+ dcs[pn_item[0]].name+' rstp_enable=true')
     glog.info('added link from DCs to ToR')
 
     # create REST API endpoint
@@ -445,6 +445,47 @@ def allocate_chains(dcs, allocs, chain_index):
 
 def plumb_chains(net, vnfs, num_of_chains, chain_index):
 
+    # vnfs have the following format:
+    # {fw: [{chain0_fw: obj}, {chain1_fw: obj}, ...],
+    #  nat: [{chain0_nat: obj}, {chain1_nat: obj}, ...],
+    #  ...}
+
+    # execute /start.sh script inside all firewalls. It starts Ryu
+    # controller and OVS with proper configuration.
+    vnf_index = 0
+    for vnf_name_and_obj in vnfs['fw']:
+        vnf_name = vnf_name_and_obj.keys()[0]
+        cmd = 'sudo docker exec mn.%s /root/start.sh %s &' % (vnf_name, vnf_index)
+        execStatus = subprocess.call(cmd, shell=True)
+        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
+        vnf_index = vnf_index + 1
+
+    glog.info('> sleeping 10s to let ryu controller initialize properly')
+    time.sleep(10)
+    glog.info('< wait complete')
+    glog.info('fw start done')
+
+    # execute /start.sh script inside ids image. It bridges input and output
+    # interfaces with br0, and starts ids process listering on br0.
+    for vnf_name_and_obj in vnfs['ids']:
+        vnf_name = vnf_name_and_obj.keys()[0]
+        cmd = 'sudo docker exec -i mn.%s /bin/bash -c "sh /start.sh"' % vnf_name
+        execStatus = subprocess.call(cmd, shell=True)
+        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
+
+    # execute /start.sh script inside nat image. It attaches both input
+    # and output interfaces to OVS bridge to enable packet forwarding.
+    for vnf_name_and_obj in vnfs['nat']:
+        vnf_name = vnf_name_and_obj.keys()[0]
+        cmd = 'sudo docker exec -i mn.%s /bin/bash /start.sh' % vnf_name
+        execStatus = subprocess.call(cmd, shell=True)
+        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
+
+    glog.info('> sleeping 5s to let fw, ids, nat initialize properly...')
+    time.sleep(5)
+    glog.info('< 5s wait complete')
+    glog.info('start VNF chaining')
+
     # chain 'client <-> nat <-> fw <-> ids <-> vpn <-> server'
     for chain_index in range(num_of_chains):
         pair_src_name = vnfs['source'][chain_index].keys()[0]
@@ -483,49 +524,7 @@ def plumb_chains(net, vnfs, num_of_chains, chain_index):
                            bidirectional=True, cmd='add-flow')
         glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
 
-    # vnfs have the following format:
-    # {fw: [{chain0_fw: obj}, {chain1_fw: obj}, ...],
-    #  nat: [{chain0_nat: obj}, {chain1_nat: obj}, ...],
-    #  ...}
-    glog.info('> sleeping 30s to identify fw as culprit...')
-    time.sleep(30)
-    # execute /start.sh script inside all firewalls. It starts Ryu
-    # controller and OVS with proper configuration.
-    for vnf_name_and_obj in vnfs['fw']:
-        vnf_name = vnf_name_and_obj.keys()[0]
-        cmd = 'sudo docker exec mn.%s /root/start.sh %s &' % (vnf_name, chain_index)
-        execStatus = subprocess.call(cmd, shell=True)
-        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
-    glog.info('> sleeping 10s to check if everything is going well...')
-
-    time.sleep(10)    
-    glog.info('Done with sleeping, time for business')
-    # glog.info('> sleeping 10s to let ryu controller initialize properly')
-    # time.sleep(10)
-    # glog.info('< wait complete')
-    # glog.info('fw start done')
     cmds = []
-
-    # execute /start.sh script inside ids image. It bridges input and output
-    # interfaces with br0, and starts ids process listering on br0.
-    for vnf_name_and_obj in vnfs['ids']:
-        vnf_name = vnf_name_and_obj.keys()[0]
-        cmd = 'sudo docker exec -i mn.%s /bin/bash -c "sh /start.sh"' % vnf_name
-        execStatus = subprocess.call(cmd, shell=True)
-        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
-
-    # execute /start.sh script inside nat image. It attaches both input
-    # and output interfaces to OVS bridge to enable packet forwarding.
-    for vnf_name_and_obj in vnfs['nat']:
-        vnf_name = vnf_name_and_obj.keys()[0]
-        cmd = 'sudo docker exec -i mn.%s /bin/bash /start.sh' % vnf_name
-        execStatus = subprocess.call(cmd, shell=True)
-        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
-
-    glog.info('> sleeping 5s to let fw, ids, nat initialize properly...')
-    time.sleep(5)
-    glog.info('< 5s wait complete')
-    glog.info('start VNF chaining')
 
     for vnf_name_and_obj in vnfs['sink']:
         vnf_name = vnf_name_and_obj.keys()[0]
@@ -550,9 +549,9 @@ def plumb_chains(net, vnfs, num_of_chains, chain_index):
         glog.info('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
-    glog.info('> sleeping 5s to let VPN client initialize...')
+    glog.info('> sleeping 15s to let VPN client initialize...')
     time.sleep(15)
-    glog.info('< 5s wait complete')
+    glog.info('< 15s wait complete')
     glog.info('VPN client VNF started')
 
     for vnf_name_and_obj in vnfs['nat']:
@@ -566,7 +565,7 @@ def plumb_chains(net, vnfs, num_of_chains, chain_index):
         vnf_name = vnf_name_and_obj.keys()[0]
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids"' % vnf_name)
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ip route del 10.0.10.10/32"' % vnf_name)
-	cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route del -net 10.0.1.0/24 input-ids"' % vnf_name)
+
     for vnf_name_and_obj in vnfs['source']:
         vnf_name = vnf_name_and_obj.keys()[0]
         # rewrite client VNF MAC addresses for tcpreplay
@@ -582,16 +581,16 @@ def plumb_chains(net, vnfs, num_of_chains, chain_index):
         glog.info('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
-    # for chain_index in range(num_of_chains):
-    #     src_vnf_name = vnfs['source'][chain_index].keys()[0]
-    #     dst_vnf_name = vnfs['sink'][chain_index].keys()[0]
-    #     src_vnf_obj = vnfs['source'][chain_index][src_vnf_name]
-    #     dst_vnf_obj = vnfs['sink'][chain_index][dst_vnf_name]
+    for chain_index in range(num_of_chains):
+        src_vnf_name = vnfs['source'][chain_index].keys()[0]
+        dst_vnf_name = vnfs['sink'][chain_index].keys()[0]
+        src_vnf_obj = vnfs['source'][chain_index][src_vnf_name]
+        dst_vnf_obj = vnfs['sink'][chain_index][dst_vnf_name]
 
-    #     ping_res = net.ping([src_vnf_obj, dst_vnf_obj], timeout=5)
+        ping_res = net.ping([src_vnf_obj, dst_vnf_obj], timeout=5)
 
-    #     glog.info('ping %s -> %s. Packet drop %s%%',
-    #               src_vnf_name, dst_vnf_name, ping_res)
+        glog.info('ping %s -> %s. Packet drop %s%%',
+                  src_vnf_name, dst_vnf_name, ping_res)
 
 
 def start_benchmark(algo, chain_index, mbps):
@@ -701,12 +700,13 @@ if __name__ == '__main__':
     # start API and containernet
     api.start()
     net.start()
+    # os.system('sudo ovs-vsctl set Bridge tor0 rstp_enable=true')
 
     # allocate servers (Sonata DC construct) to place chains
     # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
     algos = ['netsolver', 'random', 'packing']
-    placement_algorithm = algos[0]  # netsolver
-    placement_algorithm = algos[1]  # random
+    # placement_algorithm = algos[0]  # netsolver
+    # placement_algorithm = algos[1]  # random
     placement_algorithm = algos[2]  # packing
     mbps = 10.0
     allocs = get_placement(dcs, pn_fname, vn_fname, placement_algorithm, mbps)

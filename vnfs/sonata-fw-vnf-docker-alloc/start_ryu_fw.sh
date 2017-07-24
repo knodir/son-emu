@@ -54,3 +54,12 @@ sleep 20
 curl -X PUT http://localhost:$API_PORT/firewall/module/enable/$OVS_DPID
 echo "setup generic forwarding for PCAP traffic"
 curl -X POST -d '{"nw_src": "10.0.0.0/8", "nw_dst": "10.0.0.0/8"}' http://localhost:$API_PORT/firewall/rules/$OVS_DPID
+ovs-ofctl add-flow $NAME 'priority=50000,in_port=1,action=output:2'
+ovs-ofctl add-flow $NAME 'priority=50000,in_port=2,action=output:1'
+# send ftp traffic (port 20, 21) over port #3 (output-vpn, directly to VPN)
+ovs-ofctl add-flow $NAME 'priority=60000,in_port=1,tcp,tp_src=20,actions=output:3'
+ovs-ofctl add-flow $NAME 'priority=60000,in_port=3,tcp,tp_src=20,actions=output:1'
+ovs-ofctl add-flow $NAME 'priority=60000,in_port=1,tcp,tp_src=21,actions=output:3'
+ovs-ofctl add-flow $NAME 'priority=60000,in_port=3,tcp,tp_src=21,actions=output:1'
+
+ovs-ofctl add-flow tor0 'priority=60000,nw_dst=10.0.1.4, actions=output:4'

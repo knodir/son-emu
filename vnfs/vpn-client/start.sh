@@ -14,7 +14,7 @@ iptables -A FORWARD -i input-ids -o output -j ACCEPT
 echo "iptables configuration complete"
 
 echo "starting openvpn to the server..."
-sudo openvpn client.ovpn --replay-window 64 20 &
+openvpn client.ovpn --replay-window 64 20 &
 echo "sleep 5s to let openvpn finish config"
 sleep 5
 echo "execute ifconfig to see interface"
