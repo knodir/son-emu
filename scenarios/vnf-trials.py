@@ -2,8 +2,11 @@ import time
 import subprocess
 import logging
 
+import glog
+
 from emuvim.dcemulator.net import DCNetwork
 from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
+from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM
 
 from mininet.log import setLogLevel, info
 from mininet.node import RemoteController
@@ -12,6 +15,46 @@ from mininet.net import Containernet
 from mininet.node import Controller, Docker, OVSSwitch
 from mininet.cli import CLI
 from mininet.link import TCLink, Link
+
+
+def prepareDC():
+    """ Set two data centers connected over ToR switch. The cliend and server
+    VNFs get placed on off-cloud and other VNF gets placed on 'chain-server' """
+
+    max_cu, max_mu, max_cu_net, max_mu_net = 8, 3584, 16, 20000 # 28672
+
+    net = DCNetwork(controller=RemoteController, monitor=True,
+                    dc_emulation_max_cpu=max_cu_net,
+                    dc_emulation_max_mem=max_mu_net,
+                    enable_learning=True)
+
+    off_cloud = net.addDatacenter('off_cloud')
+    chain_server = net.addDatacenter('chain_server')
+
+    rms = {}
+    rms['off_cloud'] = UpbSimpleCloudDcRM(max_cu, max_mu)
+    rms['chain_server'] = UpbSimpleCloudDcRM(max_cu, max_mu)
+
+    off_cloud.assignResourceModel(rms['off_cloud'])
+    chain_server.assignResourceModel(rms['chain_server'])
+
+    tor = net.addSwitch('tor1')
+
+    net.addLink(off_cloud, tor)
+    net.addLink(chain_server, tor)
+
+    # create REST API endpoint
+    api = RestApiEndpoint("0.0.0.0", 5001)
+
+    # connect API endpoint to containernet
+    api.connectDCNetwork(net)
+
+    api.connectDatacenter(off_cloud)
+    api.connectDatacenter(chain_server)
+
+    glog.info('successfully setup DC')
+
+    return (net, api, off_cloud, chain_server, tor)
 
 
 def basicTest():
@@ -329,41 +372,41 @@ def runFirewallOnly():
     net.stop()
 
 
-def runIDSOnly():
-    """ Put IDS between client and server to test its basic functionality. All
-    VNFs reside on a single DC. """
+def runIDSOnly(net, api, off_cloud, chain_server):
+    """ Put IDS between client and server to test its basic functionality."""
 
-    net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
-    # add one data center
-    dc = net.addDatacenter('dc1', metadata={'node-upgrade'})
+    # net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=True)
+    # # add one data center
+    # dc = net.addDatacenter('dc1', metadata={'node-upgrade'})
 
-    # create REST API endpoint
-    api = RestApiEndpoint("0.0.0.0", 5001)
+    # # create REST API endpoint
+    # api = RestApiEndpoint("0.0.0.0", 5001)
 
-    # connect API endpoint to containernet
-    api.connectDCNetwork(net)
+    # # connect API endpoint to containernet
+    # api.connectDCNetwork(net)
 
-    # connect data centers to the endpoint
-    api.connectDatacenter(dc)
+    # # connect data centers to the endpoint
+    # api.connectDatacenter(dc)
 
-    # start API and containernet
-    api.start()
-    net.start()
+    # # start API and containernet
+    # api.start()
+    # net.start()
 
     # create client with one interface
-    client = dc.startCompute("client", image='knodir/client',
-                             network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+    client = off_cloud.startCompute("client", image='knodir/client',
+            flavor_name='ids', network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
 
     # create snort VNF with two interfaces. 'input' interface for 'client' and
     # 'output' interface for the 'server' VNF.
     # snort = dc.startCompute("snort", image='sonatanfv/sonata-snort-ids-vnf',
-    snort = dc.startCompute("snort", image='knodir/snort-xenial',
-                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
-                                     {'id': 'output', 'ip': '10.0.0.4/24'}])
+    snort = chain_server.startCompute("snort", image='knodir/snort-xenial',
+            flavor_name='ids', network=[{'id': 'input', 'ip': '10.0.0.3/24'},
+                {'id': 'output', 'ip': '10.0.0.4/24'}])
 
     # create server VNF with one interface
-    server = dc.startCompute("server", image='knodir/vpn-server',
-                             network=[{'id': 'intf2', 'ip': '10.0.0.5/24'}])
+    server = off_cloud.startCompute("server", image='knodir/vpn-server',
+            flavor_name='ids', network=[{'id': 'intf2', 'ip': '10.0.0.5/24'}])
+
     print('ping client -> server before explicit chaining. Packet drop %s%%' %
           net.ping([client, server]))
 
@@ -486,14 +529,18 @@ def runVPNOnly():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
-    # logging.basicConfig(level=logging.INFO)
+    #logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
+
+    net, api, off_cloud, chain_server, tor = prepareDC()
+    api.start()
+    net.start()
 
     # basicTest()
     # runDummyForwarderOnly()
     # runDummyForwarderOVSOnly()
     # runNATOnly()
     # runFirewallOnly()
-    # runIDSOnly()
-    runVPNOnly()
+    runIDSOnly(net, api, off_cloud, chain_server)
+    # runVPNOnly()
     cleanup()
