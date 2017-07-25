@@ -197,7 +197,7 @@ def get_placement(pn_fname, vn_fname, algo):
             allocs = json.load(data_file)
         return allocs
 
-    elif algo == 'random-simple':
+    elif algo == 'random':
         glog.info('using random for chain allocation')
 
         out_fname = '/tmp/ns_out.json'
@@ -219,188 +219,7 @@ def get_placement(pn_fname, vn_fname, algo):
 
     else:
         glog.error('ERROR: unsupported allocation algorithm: %s' % algo)
-        #sys.exit(1)
-
-    # all following code is for random and packing allocations
-    # since packing is already done in above elif case, this is for random only
-
-    # Read physical network from file.
-    with open(pn_fname) as data_file:
-        pn = json.load(data_file)
-
-    # Read virtual network from file.
-    with open(vn_fname) as data_file:
-        vn = json.load(data_file)
-
-    # get 'off-cloud' and 'chain-server' server names on a separate list. We
-    # place 'source' and 'sink' VNFs on 'off-cloud', and all other VNFs on the
-    # 'chain-server's. This is done to replicate E2 experiment, where traffic
-    # generator VNF (source) and traffic sink is placed on different servers
-    # (from VNFs).
-    off_cloud = []
-    chain_server = []
-    for server_name in pn['Servers']:
-        if server_name.startswith('off-cloud'):
-            off_cloud.append(server_name)
-        elif server_name.startswith('chain-server'):
-            chain_server.append(server_name)
-        else:
-            glog.error('ERROR: unknown server type %s, skipping', server_name)
-            #sys.exit(1)
-
-    glog.info('off_cloud: %s', off_cloud)
-    glog.info('chain_server: %s', chain_server)
-
-    # get bandwidth for each VNF. Note that we assume VN format (of input JSON
-    # file) is [vnf_source, vnf_destination, bandwidth_amount] and there is no
-    # duplicate for VNF src-dst pair. This is true since we handcraft chain JSON
-    # files (but something to be aware if JSON is auto-generated, where the VNF
-    # order might get mixed).
-    vnf_bws = {}
-    for vnf in vn['VN']:
-        vnf_name = vnf[0]
-        if vnf_name in vnf_bws.keys():
-            vnf_bws[vnf_name] += vnf[2]
-        else:
-            vnf_bws[vnf_name] = vnf[2]
-        last_vnf_name = vnf[1]
-    # following must be a 'sink' VNF, which does not appear as a 'source' VNF
-    # (as the first element) at all, but we need to add it as a VNF too.
-    vnf_bws[last_vnf_name] = vnf[2]
-
-    glog.info('vnf_bws: %s', vnf_bws)
-    sys.exit(0)
-
-    # candidate_servers contains list of server names which have enough capacity
-    # [cpu, ram, bandwidth] to host this VNF.
-    candidate_servers = []
-    allocations = {}
-    assignments, bandwidth = [], []
-    assignments_dict = {}
-    chain_index = 0
-    enough_resources = True
-    sorted_chain = topo_sort(vn['VMs'])
-
-    # loop until servers have resources to host VNFs. Note that partial chain
-    # allocations are invalid and we ignore them (at the end of the loop).
-    while enough_resources:
-        for vnf_name in sorted_chain:
-            vnf_cpu = vn['VMs'][vnf_name][0] * vnf_bws[vnf_name]
-            vnf_ram = vn['VMs'][vnf_name][1] * vnf_bws[vnf_name]
-            vnf_bw = vn['VMs'][vnf_name][2] * vnf_bws[vnf_name]
-            # iterate through each server and add it to the candidate_servers
-            # list if it has enough resources to host this VNF. Then we select
-            # one of these servers based on the algorithm. RoundRobin randomly
-            # chooses a server from candidates while DepthFirst always chooses
-            # the first server on the list.
-            # Note that pn['Servers'][sname] represents [cpu, ram, bandwidth]
-            # capacity of the server and vn['VMs'][vnf_name] represents VNF
-            # capacity in the same order.
-            if vnf_name == 'source' or vnf_name == 'sink':
-                # sname means 'server name'
-                for sname in off_cloud:
-                    if (pn['Servers'][sname][0] - vnf_cpu >= 0) and (
-                            pn['Servers'][sname][1] - vnf_ram >= 0) and (
-                            pn['Servers'][sname][2] - vnf_bw >= 0):
-                        # glog.info('%s has enough resources [%.4f, %.4f, %.4f]'+
-                        glog.debug('%s has enough resources [%.4f, %.4f, %.4f]' +
-                                   ' to host %s [%.4f, %.4f, %.4f]', sname,
-                                   pn['Servers'][sname][0],
-                                   pn['Servers'][sname][1],
-                                   pn['Servers'][sname][2], vnf_name, vnf_cpu,
-                                   vnf_ram, vnf_bw)
-                        candidate_servers.append(sname)
-            else:  # this is a chain VNF
-                for sname in chain_server:
-                    if (pn['Servers'][sname][0] - vnf_cpu >= 0) and (
-                            pn['Servers'][sname][1] - vnf_ram >= 0) and (
-                            pn['Servers'][sname][2] - vnf_bw >= 0):
-                        # glog.info('%s has enough resources [%.4f, %.4f, %.4f]'+
-                        glog.debug('%s has enough resources [%.4f, %.4f, %.4f]' +
-                                   ' to host %s [%.4f, %.4f, %.4f]', sname,
-                                   pn['Servers'][sname][0],
-                                   pn['Servers'][sname][1],
-                                   pn['Servers'][sname][2], vnf_name, vnf_cpu,
-                                   vnf_ram, vnf_bw)
-                        candidate_servers.append(sname)
-
-            if len(candidate_servers) == 0:
-                # no more VNF allocation possible. We can ignore the last
-                # partial chain allocation since chains have to be fully
-                # allocated to be a valid allocation.
-                glog.info('failed to allocate %s because candidate_servers is' +
-			  ' empty. No more allocations are possible.' +
-                          ' Completed %d allocations.', vnf_name, chain_index)
-                enough_resources = False
-                break
-
-            if algo == 'random':
-                # randomly choose a server from the candidate list
-		random.shuffle(candidate_servers)
-                #sname = random.choice(candidate_servers)
-                sname = candidate_servers[0]
-            elif algo == 'packing':
-                # always choose the first server on the list. Note that Python
-                # retains an order items appended to the list. Because
-                # 'off_cloud' and 'chain_server' lists are constant, and we
-                # iterate through these lists and append them into
-                # 'candidate_servers' in the same order, choosing the first
-                # server on the list always going to be the same server (as long
-                # as it has enough resources to host the VNF). This is exactly
-                # how packing algorithm operates.
-                sname = candidate_servers[0]
-
-            # empty candidate_servers for the next iteration
-            candidate_servers = []
-            # decrease available resources from the chosen server
-            pn['Servers'][sname][0] -= vnf_cpu
-            pn['Servers'][sname][1] -= vnf_ram
-            pn['Servers'][sname][2] -= vnf_bw
-            glog.info('Server %s CPU: %s', sname, pn['Servers'][sname][0])
-            glog.info('Server %s RAM: %s', sname, pn['Servers'][sname][1])
-            glog.info('Server %s BW: %s', sname, pn['Servers'][sname][2])
-
-            # Note that we do not decrease link bandwidth on ToR switch because
-            # we know this is a single rack environment (all servers are
-            # connected to the same ToR switch). On a single rack topology,
-            # decrementing the server bandwidth suffice because ToR switch
-            # provides full bisection bandwidth. This will not be true for
-            # multi-rack topologies (watch out Sam) without full bisection
-            # bandwidth (ToR-to-OtherSwitch links can get saturated before
-            # server-to-ToR links).
-
-            assignments.append([vnf_name, sname])
-            assignments_dict[vnf_name] = sname
-
-        glog.debug('assignments = %s', assignments)
-        glog.debug('assignments_dict = %s', assignments_dict)
-
-        if enough_resources:
-            # do not deduct bandwidth from server-to-ToR link if the VNF pair
-            # is assigned to the same server. Since the code above already
-            # deducts the bandwidth we just increase the same amount back.
-            for pair in vn['VN']:
-                glog.debug('pair = %s', pair)
-                if ('source' in pair) or ('sink' in pair):
-                    # ignore source and sink VNFs since they are always placed
-                    # on different server than other VNFs.
-                    continue
-                if assignments_dict[pair[0]] == assignments_dict[pair[1]]:
-                    glog.debug('both %s are assigned to the same server %s',
-                               pair, assignments_dict[pair[0]])
-                    pn['Servers'][sname][2] += vn['VMs'][pair[0]][2] * vnf_bws[pair[0]]
-                    pn['Servers'][sname][2] += vn['VMs'][pair[1]][2] * vnf_bws[pair[1]]
-
-            # add this chain allocation to the list of allocations
-            allocations['allocation_%d' % chain_index] = {
-                'assignment': assignments, 'bandwidth': bandwidth}
-
-            # increment chain index and renew assignment after completing each
-            # chain allocation
-            chain_index += 1
-            assignments = []
-            assignments_dict = {}
-
+        sys.exit(1)
 
     # "allocs" has the following format
     # {'allocation_0':
@@ -689,18 +508,17 @@ if __name__ == '__main__':
     # e2-azure-1rack-50servers
     vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
     pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
-    #net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 0.90, 417792)
+    net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 0.90, 417792)
 
     # start API and containernet
-    #api.start()
-    #net.start()
+    api.start()
+    net.start()
 
     # allocate servers (Sonata DC construct) to place chains
     # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
     algos = ['netsolver', 'random', 'packing']
-    #allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
-    allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
-    #allocs = get_placement(pn_fname, vn_fname, 'random-simple')  # random-simple
+    allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
+    #allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
     #allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
     num_of_chains = 0
     for alloc in allocs:
@@ -708,7 +526,7 @@ if __name__ == '__main__':
             num_of_chains += 1
 
     glog.info('allocs: %s; num_of_chains = %d', allocs, num_of_chains)
-    sys.exit(0)
+    #sys.exit(0)
     # allocate chains by placing them on appropriate servers
     vnfs = allocate_chains(dcs, allocs)
     # configure the datapath on chains to push packets through them
