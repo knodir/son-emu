@@ -113,7 +113,7 @@ class DCNetwork(Containernet):
         self.DCNetwork_graph = nx.MultiDiGraph()
 
         # initialize pool of vlan tags to setup the SDN paths
-        self.vlans = range(1, 4096)[::-1]
+        self.vlans = range(2, 4096)[::-1]
 
         # link to Ryu REST_API
         ryu_ip = 'localhost'
@@ -505,7 +505,6 @@ class DCNetwork(Containernet):
                 elif monitor_placement not in ['rx', 'tx']:
                     LOG.exception('invalid monitor command: {0}'.format(monitor_placement))
 
-
                 if self.controller == RemoteController and insert_flow:
                     ## set flow entry via ryu rest api
                     self._set_flow_entry_ryu_rest(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
@@ -683,9 +682,11 @@ class DCNetwork(Containernet):
                 next_hop = vnf_dst_name
 
             next_node = self.getNodeByName(next_hop)
-
+            end_node = False
             if next_hop == vnf_dst_name:
                 switch_outport_nr = dst_sw_outport_nr
+                if (("vpn" in vnf_dst_name and not("sink" in vnf_src_name)) or ("nat" in vnf_dst_name and not("source" in vnf_src_name))):
+                    end_node = True
                 LOG.info("end node reached: {0}".format(vnf_dst_name))
             elif not isinstance( next_node, OVSSwitch ):
                 LOG.info("Next node: {0} is not a switch".format(next_hop))
@@ -711,7 +712,7 @@ class DCNetwork(Containernet):
                     # self._set_flow_entry_dpctl(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
                 else:
                     ## set flow entry via ovs-ofctl
-                    self._set_flow_entry_dpctl(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
+                    self._set_flow_entry_dpctl(current_node, switch_inport_nr, switch_outport_nr, end_node, **kwargs)
 
             # take first link between switches by default
             if isinstance( next_node, OVSSwitch ):
@@ -826,10 +827,9 @@ class DCNetwork(Containernet):
         node.vsctl('set', 'port {0} tag={1}'.format(switch_port,tag))
         LOG.debug("set vlan in switch: {0} in_port: {1} vlan tag: {2}".format(node.name, switch_port, tag))
 
-    def _set_flow_entry_dpctl(self, node, switch_inport_nr, switch_outport_nr, **kwargs):
+    def _set_flow_entry_dpctl(self, node, switch_inport_nr, switch_outport_nr, end_node, **kwargs):
 
         match = 'in_port=%s' % switch_inport_nr
-
         cookie = kwargs.get('cookie')
         match_input = kwargs.get('match')
         cmd = kwargs.get('cmd')
@@ -846,7 +846,12 @@ class DCNetwork(Containernet):
         if cmd == 'add-flow':
             action = 'action=%s' % switch_outport_nr
             if vlan != None:
-                if index == 0: # first node
+                if end_node:
+                    # match += ',dl_vlan=%s' % vlan
+                    action = 'action=strip_vlan,output=%s' % switch_outport_nr
+                    LOG.info("Detected NAT/VPN Node({3}) in switch: {0} in_port: {1} out_port: {2}".format(node.name, switch_inport_nr,
+                                                             switch_outport_nr, end_node))
+                elif index == 0: # first node
                     action = ('action=mod_vlan_vid:%s' % vlan) + (',output=%s' % switch_outport_nr)
                     match = '-O OpenFlow13 ' + match
                 elif index == len(path) - 1:  # last node

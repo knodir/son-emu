@@ -65,7 +65,7 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     net = DCNetwork(controller=DefaultController, monitor=True,
                     dc_emulation_max_cpu=max_cu_net,
                     dc_emulation_max_mem=max_mu_net,
-                    enable_learning=True)
+                    enable_learning=False)
 
     # Read physical topology from file.
     with open(pn_fname) as data_file:
@@ -620,7 +620,7 @@ def benchmark(algo, line, mbps):
     cmds[:] = []
 
     for chain_index in range(num_of_chains):
-        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "dstat --net --time -N tun0 --bits --output /tmp/dstat.csv" &' % chain_index)
+        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "dstat --net --time -N intf2 --bits --output /tmp/dstat.csv" &' % chain_index)
         cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "iperf3 -s" &' % chain_index)
 
     for cmd in cmds:
@@ -635,7 +635,7 @@ def benchmark(algo, line, mbps):
     for chain_index in range(num_of_chains):
         # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
         # cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (chain_index, mbps))
-        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "iperf3 -V -b %dm -c 10.0.10.10 -t 120" &' % (chain_index, mbps))
+        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "iperf3 -V -b %dM -c 10.0.10.10 -t 70" &' % (chain_index, mbps))
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -702,20 +702,20 @@ if __name__ == '__main__':
     # max_cu_net = 600 => 10 dc_cu x 60 physical cores
 
     # e2-nss-1rack-8servers
-    pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
-    vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
+    # pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
+    # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
 
     # e2-azure-1rack-50servers
-    # vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
-    # pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
+    vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
+    pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
     algos = ['daisy', 'random', 'packing']
     bandwidths = [10]
 
     for mbps in bandwidths:
         for algo in algos:
             # start API and containernet
-            # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 1000, 417792)
-            net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
+            net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 1000, 417792)
+            # net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
             api.start()
             net.start()
 

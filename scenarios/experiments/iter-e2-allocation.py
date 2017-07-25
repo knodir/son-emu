@@ -62,7 +62,7 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     # because of the contention between OVS and cgroup mem limitation) and
     # Sonata VM OOM killer starts killing random processes.
 
-    net = DCNetwork(controller=DefaultController, monitor=True,
+    net = DCNetwork(controller=DefaultController, monitor=False,
                     dc_emulation_max_cpu=max_cu_net,
                     dc_emulation_max_mem=max_mu_net,
                     enable_learning=False)
@@ -620,8 +620,8 @@ def start_benchmark(algo, chain_index, mbps):
     print('<<< wait complete.')
     print(mbps)
     # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
-    cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=10 -d 1 --intf1=intf1 /output.pcap" &'
-                % chain_index)
+    cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &'
+                % (chain_index, mbps))
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -700,15 +700,16 @@ if __name__ == '__main__':
     # start API and containernet
     api.start()
     net.start()
-    # os.system('sudo ovs-vsctl set Bridge tor0 rstp_enable=true')
+    # os.system('sudo ovs-vsctl set Bridge tor0 rstp_enable=false')
+    # os.system('sudo ovs-vsctl set Bridge tor0 rstp_enable=false')
 
     # allocate servers (Sonata DC construct) to place chains
     # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
     algos = ['netsolver', 'random', 'packing']
-    # placement_algorithm = algos[0]  # netsolver
-    # placement_algorithm = algos[1]  # random
+    placement_algorithm = algos[0]  # netsolver
+    placement_algorithm = algos[1]  # random
     placement_algorithm = algos[2]  # packing
-    mbps = 10.0
+    mbps = 100.0
     allocs = get_placement(dcs, pn_fname, vn_fname, placement_algorithm, mbps)
     num_of_chains = allocs
 
