@@ -66,7 +66,9 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
                     dc_emulation_max_mem=max_mu_net,
                     enable_learning=True)
 
-    # Read physical topology from file.
+    # Read physical topology from file. Note that cpu/ram/bandwidth numbers in
+    # .pn file does not really matter. We just use server names and server to
+    # ToR connectivity information from the .pn file.
     with open(pn_fname) as data_file:
         data = json.load(data_file)
 
@@ -135,6 +137,23 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     return (net, api, dcs, tors)
 
 
+def topo_sort(chain):
+    """ Handcrafted topological sort for 4node chain. Note that this is a manual
+    sort which does not work for anything other than 4node chain (e.g., won't
+    work for existing 10node chain). This is okay since we have an actual Docker
+    based chain implementation only for 4node chain.
+    TODO(nodir): make this work for generic chains. """
+    if (len(chain) == 6) and ('source' in chain.keys()) and (
+            'nat' in chain.keys()) and ('fw' in chain.keys()) and (
+            'ids' in chain.keys()) and ('vpn' in chain.keys()) and (
+                    'sink' in chain.keys()):
+                glog.info('this seems to be correct 4node chain')
+                return ['source', 'nat', 'fw', 'ids', 'vpn', 'sink']
+    else:
+        glog.error('ERROR: topo_sort() works for 4node chain only')
+        sys.exit(1)
+
+
 def get_placement(pn_fname, vn_fname, algo):
     """ Does chain placement with NetSolver and returns the output. """
 
@@ -158,8 +177,52 @@ def get_placement(pn_fname, vn_fname, algo):
         with open(out_fname) as data_file:
             allocs = json.load(data_file)
         return allocs
+    elif algo == 'packing':
+        glog.info('using packing for chain allocation')
+
+        out_fname = '/tmp/ns_out.json'
+        cmd = "export PYTHONHASHSEED=1 && python3 %s %s %s %s %s %s" % (
+            "../../../monosat_datacenter/src/simple_nfv.py", pn_fname,
+            vn_fname, "--output", out_fname, "--locality")
+        execStatus = subprocess.call(cmd, shell=True)
+        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
+
+        if execStatus == 1:
+            glog.info("allocation failed")
+            return execStatus
+
+        glog.info("allocation succeeded")
+        # Read physical topology from file.
+        with open(out_fname) as data_file:
+            allocs = json.load(data_file)
+        return allocs
+
+    elif algo == 'random-simple':
+        glog.info('using random for chain allocation')
+
+        out_fname = '/tmp/ns_out.json'
+        cmd = "export PYTHONHASHSEED=1 && python3 %s %s %s %s %s %s" % (
+            "../../../monosat_datacenter/src/simple_nfv.py", pn_fname,
+            vn_fname, "--output", out_fname, "--random")
+        execStatus = subprocess.call(cmd, shell=True)
+        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
+
+        if execStatus == 1:
+            glog.info("allocation failed")
+            return execStatus
+
+        glog.info("allocation succeeded")
+        # Read physical topology from file.
+        with open(out_fname) as data_file:
+            allocs = json.load(data_file)
+        return allocs
+
+    else:
+        glog.error('ERROR: unsupported allocation algorithm: %s' % algo)
+        #sys.exit(1)
 
     # all following code is for random and packing allocations
+    # since packing is already done in above elif case, this is for random only
 
     # Read physical network from file.
     with open(pn_fname) as data_file:
@@ -182,8 +245,8 @@ def get_placement(pn_fname, vn_fname, algo):
         elif server_name.startswith('chain-server'):
             chain_server.append(server_name)
         else:
-            glog.info('ERROR: unknown server type %s', server_name)
-            sys.exit(1)
+            glog.error('ERROR: unknown server type %s, skipping', server_name)
+            #sys.exit(1)
 
     glog.info('off_cloud: %s', off_cloud)
     glog.info('chain_server: %s', chain_server)
@@ -206,6 +269,7 @@ def get_placement(pn_fname, vn_fname, algo):
     vnf_bws[last_vnf_name] = vnf[2]
 
     glog.info('vnf_bws: %s', vnf_bws)
+    sys.exit(0)
 
     # candidate_servers contains list of server names which have enough capacity
     # [cpu, ram, bandwidth] to host this VNF.
@@ -215,11 +279,12 @@ def get_placement(pn_fname, vn_fname, algo):
     assignments_dict = {}
     chain_index = 0
     enough_resources = True
+    sorted_chain = topo_sort(vn['VMs'])
 
     # loop until servers have resources to host VNFs. Note that partial chain
     # allocations are invalid and we ignore them (at the end of the loop).
     while enough_resources:
-        for vnf_name in vn['VMs']:
+        for vnf_name in sorted_chain:
             vnf_cpu = vn['VMs'][vnf_name][0] * vnf_bws[vnf_name]
             vnf_ram = vn['VMs'][vnf_name][1] * vnf_bws[vnf_name]
             vnf_bw = vn['VMs'][vnf_name][2] * vnf_bws[vnf_name]
@@ -263,14 +328,17 @@ def get_placement(pn_fname, vn_fname, algo):
                 # no more VNF allocation possible. We can ignore the last
                 # partial chain allocation since chains have to be fully
                 # allocated to be a valid allocation.
-                glog.info('candidate_servers is empty. No more allocation is' +
-                          ' possible. Completed %d allocations.', chain_index)
+                glog.info('failed to allocate %s because candidate_servers is' +
+			  ' empty. No more allocations are possible.' +
+                          ' Completed %d allocations.', vnf_name, chain_index)
                 enough_resources = False
                 break
 
             if algo == 'random':
                 # randomly choose a server from the candidate list
-                sname = random.choice(candidate_servers)
+		random.shuffle(candidate_servers)
+                #sname = random.choice(candidate_servers)
+                sname = candidate_servers[0]
             elif algo == 'packing':
                 # always choose the first server on the list. Note that Python
                 # retains an order items appended to the list. Because
@@ -332,6 +400,7 @@ def get_placement(pn_fname, vn_fname, algo):
             chain_index += 1
             assignments = []
             assignments_dict = {}
+
 
     # "allocs" has the following format
     # {'allocation_0':
@@ -598,6 +667,7 @@ def plumb_chains(net, vnfs, num_of_chains):
 
 
 if __name__ == '__main__':
+    random.seed(1)
     logging.basicConfig(level=logging.DEBUG)
 
     # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
@@ -619,25 +689,26 @@ if __name__ == '__main__':
     # e2-azure-1rack-50servers
     vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
     pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
-    net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 0.90, 417792)
+    #net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 0.90, 417792)
 
     # start API and containernet
-    api.start()
-    net.start()
+    #api.start()
+    #net.start()
 
     # allocate servers (Sonata DC construct) to place chains
     # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
     algos = ['netsolver', 'random', 'packing']
-    allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
-    # allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
-    # allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
+    #allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
+    allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
+    #allocs = get_placement(pn_fname, vn_fname, 'random-simple')  # random-simple
+    #allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
     num_of_chains = 0
     for alloc in allocs:
         if alloc.startswith('allocation'):
             num_of_chains += 1
 
     glog.info('allocs: %s; num_of_chains = %d', allocs, num_of_chains)
-    # sys.exit(0)
+    sys.exit(0)
     # allocate chains by placing them on appropriate servers
     vnfs = allocate_chains(dcs, allocs)
     # configure the datapath on chains to push packets through them
