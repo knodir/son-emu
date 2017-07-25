@@ -10,6 +10,7 @@ import os
 
 import thread
 from mininet.node import RemoteController
+from mininet.node import DefaultController
 from mininet.clean import cleanup
 
 
@@ -58,8 +59,7 @@ def prepareDC():
     # because of the contention between OVS and cgroup mem limitation) and
     # Sonata VM OOM killer starts killing random processes.
 
-    net = DCNetwork(controller=RemoteController, monitor=True,
-                    enable_learning=False)
+    net = DCNetwork(controller=RemoteController, monitor=False, enable_learning=False)
 
     # reg = ResourceModelRegistrar(MAX_CU, MAX_MU)
     # rm = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
@@ -293,14 +293,14 @@ def clean_and_save(cmds, multiplier):
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "pkill python2"')
     # copy the iperf client output file to the local machine
     # cmds.append('sudo docker cp mn.client:/tmp/iperf3.json ./output/from-client.json')
-    cmds.append('rm -rf ./results/upgrade' + str(multiplier / 10**6) + '*.csv')
-    cmds.append('sudo docker cp mn.client:/tmp/dstat.csv ./results/upgrade' +
+    cmds.append('rm -rf ./results/upgrade/' + str(multiplier / 10**6) + '*.csv')
+    cmds.append('sudo docker cp mn.client:/tmp/dstat.csv ./results/upgrade/' +
                 str(multiplier / 10**6) + '-from-client.csv')
-    cmds.append('sudo docker cp mn.ids1:/tmp/dstat.csv ./results/upgrade' +
+    cmds.append('sudo docker cp mn.ids1:/tmp/dstat.csv ./results/upgrade/' +
                 str(multiplier / 10**6) + '-from-ids1.csv')
-    cmds.append('sudo docker cp mn.ids2:/tmp/dstat.csv ./results/upgrade' +
+    cmds.append('sudo docker cp mn.ids2:/tmp/dstat.csv ./results/upgrade/' +
                 str(multiplier / 10**6) + '-from-ids2.csv')
-    cmds.append('sudo docker cp mn.vpn:/tmp/dstat.csv ./results/upgrade' +
+    cmds.append('sudo docker cp mn.vpn:/tmp/dstat.csv ./results/upgrade/' +
                 str(multiplier / 10**6) + '-from-vpn.csv')
     # do remaining cleanup inside containers
     # cmds.append('sudo docker exec -i mn.server /bin/bash -c "pkill iperf3"')
@@ -380,7 +380,7 @@ def benchmark(multiplier):
     cmds.append('sudo docker exec -i mn.ids2 /bin/bash -c "dstat --net --time -N input --bits --output /tmp/dstat.csv" &')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "dstat --net --time -N input-fw --bits --output /tmp/dstat.csv" &')
     # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
-    cmds.append('sudo timeout 123 docker exec -i mn.client /bin/bash -c "tcpreplay --loop=0 --mbps=' +
+    cmds.append('sudo timeout 123 docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache --loop=0 --mbps=' +
                 str(multiplier / 10**6) + ' -d 1 --intf1=intf1 /ftp.ready.pcap" &')
 
     for cmd in cmds:
@@ -398,7 +398,7 @@ def benchmark(multiplier):
     # start iperf client or replay enterprise traces
     # cmd = 'sudo docker exec -i mn.client /bin/bash -c "iperf3 -c 10.8.0.1 -t 60 -b 10M --no-delay --omit 0 --json --logfile /tmp/iperf3.json"'
     # each loop is around 40s for 10 Mbps speed, 2 loops easily make 1m
-    cmd = 'sudo timeout 120 docker exec -i mn.client /bin/bash -c "tcpreplay --loop=0 --mbps=' + \
+    cmd = 'sudo timeout 120 docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache --loop=0 --mbps=' + \
         str(multiplier / 10**6) + ' -d 1 --intf1=intf1 /output.pcap" &'
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from %s (0 is success)' % (execStatus, cmd))
@@ -418,7 +418,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
     net = nodeUpgrade()
-    print("Done with scaleout!")
+    print("Done with upgrade!")
     print('Running 10 Mbps')
     benchmark(10**7)
     print('Running 100 Mbps')

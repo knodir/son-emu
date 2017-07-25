@@ -676,11 +676,6 @@ def finish_benchmarks(line, algo, mbps):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
-    vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
-    # e2-nss-1rack-8servers
-    pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
-    net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
-
     # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-azure-1rack-24servers
     # pn_fname = "../topologies/e2-azure-1rack-24servers.pn.json"
@@ -692,11 +687,20 @@ if __name__ == '__main__':
     # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
     # max_cu_net = 600 => 10 dc_cu x 60 physical cores
 
-    # e2-azure-1rack-50servers
-    # vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
-    # pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
-    # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
-
+    if sys.argv[1] == "nss":
+        # e2-nss-1rack-8servers
+        pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
+        vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
+    else:
+        # e2-azure-1rack-50servers
+        vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
+        pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
+    algos = ['daisy', 'random', 'packing']
+    bandwidths = [10]
+    if sys.argv[1] == "nss":
+        net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
+    else:
+        net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 1000, 417792)
     # start API and containernet
     api.start()
     net.start()

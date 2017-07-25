@@ -62,10 +62,10 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     # because of the contention between OVS and cgroup mem limitation) and
     # Sonata VM OOM killer starts killing random processes.
 
-    net = DCNetwork(controller=DefaultController, monitor=True,
+    net = DCNetwork(controller=RemoteController, monitor=False,
                     dc_emulation_max_cpu=max_cu_net,
                     dc_emulation_max_mem=max_mu_net,
-                    enable_learning=False)
+                    enable_learning=True)
 
     # Read physical topology from file.
     with open(pn_fname) as data_file:
@@ -366,7 +366,7 @@ def allocate_chains(dcs, allocs):
             glog.info('Chain Mapping: %f', chain_mapping)
 
         # iterate over each chain and create chain VNFs by placing it on an
-        # appropriate server (such as chosen by daisy)..
+        # appropriate server (such as chosen by NetSolver)..
         for vnf_mapping in chain_mapping['assignment']:
             glog.info('vnf_mapping = %s', vnf_mapping)
             vnf_name = vnf_mapping[0]
@@ -401,7 +401,7 @@ def allocate_chains(dcs, allocs):
                 # node-upgrade experiment requires knodir/sonata-fw-vnf:upgrade
                 # image as it has an additional interface for ids2.
                 vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                        image='knodir/sonata-fw-fixed', flavor_name="fw",
+                                                        image='knodir/sonata-fw-ryu', flavor_name="fw",
                                                         network=[{'id': 'input', 'ip': '10.0.1.5/24'},
                                                                  {'id': 'output-ids', 'ip': '10.0.1.61/24'},
                                                                  {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
@@ -465,10 +465,10 @@ def plumb_chains(net, vnfs, num_of_chains):
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
         vnf_index = vnf_index + 1
 
-    # glog.info('> sleeping 10s to let ryu controller initialize properly')
-    # time.sleep(10)
-    # glog.info('< wait complete')
-    # glog.info('fw start done')
+    glog.info('> sleeping 10s to let ryu controller initialize properly')
+    time.sleep(10)
+    glog.info('< wait complete')
+    glog.info('fw start done')
 
     # execute /start.sh script inside ids image. It bridges input and output
     # interfaces with br0, and starts ids process listering on br0.
@@ -554,9 +554,9 @@ def plumb_chains(net, vnfs, num_of_chains):
         glog.info('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
-    glog.info('> sleeping 5s to let VPN client initialize...')
-    time.sleep(5)
-    glog.info('< 5s wait complete')
+    glog.info('> sleeping 15s to let VPN client initialize...')
+    time.sleep(15)
+    glog.info('< 15s wait complete')
     glog.info('VPN client VNF started')
 
     for vnf_name_and_obj in vnfs['nat']:
@@ -701,21 +701,24 @@ if __name__ == '__main__':
     # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
     # max_cu_net = 600 => 10 dc_cu x 60 physical cores
 
-    # e2-nss-1rack-8servers
-    # pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
-    # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
-
-    # e2-azure-1rack-50servers
-    vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
-    pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
+    if sys.argv[1] == "nss":
+        # e2-nss-1rack-8servers
+        pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
+        vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
+    else:
+        # e2-azure-1rack-50servers
+        vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
+        pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
     algos = ['daisy', 'random', 'packing']
     bandwidths = [10]
 
     for mbps in bandwidths:
         for algo in algos:
             # start API and containernet
-            net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 1000, 417792)
-            # net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
+            if sys.argv[1] == "nss":
+                net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
+            else:
+                net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 1000, 417792)
             api.start()
             net.start()
 

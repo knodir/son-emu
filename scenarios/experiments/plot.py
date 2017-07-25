@@ -58,26 +58,29 @@ def plot_upgrade(mbps):
     omit_sec, duration = 3, 74
     # for client we monitor TX traffic, which is the value on the 2nd position
     # of the CSV file.
-    client_bw = extract_dstat('./results/upgrade' +
+    client_bw = extract_dstat('./results/upgrade/' +
                               str(mbps) + '-from-client.csv', 2, omit_sec,
                               duration)
     print('client_bw = %s, len = %d' % (client_bw, len(client_bw)))
 
     # for all other VNFs we monitor RX traffic, which is the value on the 1st
     # position of the CSV file.
-    ids1_bw = extract_dstat('./results/upgrade-from-ids1.csv', 1, omit_sec,
+    ids1_bw = extract_dstat('./results/upgrade/' +
+                              str(mbps) + '-from-ids1.csv', 1, omit_sec,
                             duration)
     print('ids1_bw = %s, len = %d' % (ids1_bw, len(ids1_bw)))
 
-    ids2_bw = extract_dstat('./results/upgrade-from-ids2.csv', 1, omit_sec,
+    ids2_bw = extract_dstat('./results/upgrade/' +
+                              str(mbps) + '-from-ids2.csv', 1, omit_sec,
                             duration)
     print('ids2_bw = %s, len = %d' % (ids2_bw, len(ids2_bw)))
 
-    vpn_bw = extract_dstat('./results/upgrade-from-vpn.csv', 1, omit_sec,
+    vpn_bw = extract_dstat('./results/upgrade/' +
+                              str(mbps) + '-from-vpn.csv', 1, omit_sec,
                            duration)
     print('vpn_bw = %s, len = %d' % (vpn_bw, len(vpn_bw)))
 
-    figure_name = 'results/upgrade' + str(mbps) + '.png'
+    figure_name = 'results/upgrade/' + str(mbps) + '.png'
     t = np.arange(0.0, 74, 1)
 
     # Plots the figure
@@ -103,24 +106,24 @@ def plot_scaleout(mbps):
     omit_sec, duration = 3, 67
     # for client we monitor TX traffic, which is the value on the 2nd position
     # of the CSV file.
-    client_bw = extract_dstat('./results/scaleout' +
+    client_bw = extract_dstat('./results/scaleout/scaleout' +
                               str(mbps) + '-from-client.csv', 2, omit_sec,
                               duration)
     print('client_bw = %s, len = %d' % (client_bw, len(client_bw)))
 
     # for all other VNFs we monitor RX traffic, which is the value on the 1st
     # position of the CSV file.
-    ids1_bw = extract_dstat('./results/scaleout' +
+    ids1_bw = extract_dstat('./results/scaleout/scaleout' +
                             str(mbps) + '-from-ids1.csv', 2, omit_sec,
                             duration)
     print('ids1_bw = %s, len = %d' % (ids1_bw, len(ids1_bw)))
 
-    vpn_bw = extract_dstat('./results/scaleout' +
+    vpn_bw = extract_dstat('./results/scaleout/scaleout' +
                            str(mbps) + '-from-vpn.csv', 2, omit_sec,
                            duration)
     print('vpn_bw = %s, len = %d' % (vpn_bw, len(vpn_bw)))
 
-    figure_name = 'results/scaleout' + str(mbps) + '.png'
+    figure_name = 'results/scaleout/' + str(mbps) + '.png'
     t = np.arange(0.0, 67, 1)
 
     # Plots the figure

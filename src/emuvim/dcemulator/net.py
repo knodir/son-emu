@@ -847,11 +847,11 @@ class DCNetwork(Containernet):
             action = 'action=%s' % switch_outport_nr
             if vlan != None:
                 if end_node:
-                    # match += ',dl_vlan=%s' % vlan
-                    action = 'action=strip_vlan,output=%s' % switch_outport_nr
-                    LOG.info("Detected NAT/VPN Node({3}) in switch: {0} in_port: {1} out_port: {2}".format(node.name, switch_inport_nr,
-                                                             switch_outport_nr, end_node))
-                elif index == 0: # first node
+                #     # match += ',dl_vlan=%s' % vlan
+                #     action = 'action=strip_vlan,output=%s' % switch_outport_nr
+                     LOG.info("Detected NAT/VPN Node({3}) in switch: {0} in_port: {1} out_port: {2}".format(node.name, switch_inport_nr,
+                                                              switch_outport_nr, end_node))
+                if index == 0: # first node
                     action = ('action=mod_vlan_vid:%s' % vlan) + (',output=%s' % switch_outport_nr)
                     match = '-O OpenFlow13 ' + match
                 elif index == len(path) - 1:  # last node

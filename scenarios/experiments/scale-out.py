@@ -10,6 +10,7 @@ from emuvim.dcemulator.resourcemodel import ResourceModelRegistrar
 
 from mininet.log import setLogLevel, info
 from mininet.node import RemoteController
+from mininet.node import DefaultController
 from mininet.clean import cleanup
 
 
@@ -38,9 +39,10 @@ def prepareDC():
     # create one resource mode and use it for all servers, meaning all of our
     # servers are homogeneous. Create multiple RMs for heterogeneous servers
     # (with different amount of cpu,ram).
-    MAX_CU = 10  # max compute units
-    MAX_MU = 8704  # max memory units
-
+    MAX_CU = 120  # max compute units
+    MAX_MU = 30000  # max memory units
+    MAX_CU_NET = 1000
+    MAX_MU_NET = 400000
     # the cpu, ram resource above are consumed by VNFs with one of these
     # flavors. For some reason memory allocated for tiny flavor is 42 MB,
     # instead of 32 MB in this systems. Other flavors are multipliers of this
@@ -58,10 +60,12 @@ def prepareDC():
     # because of the contention between OVS and cgroup mem limitation) and
     # Sonata VM OOM killer starts killing random processes.
 
-    net = DCNetwork(controller=RemoteController, monitor=True, enable_learning=False)
+    net = DCNetwork(controller=RemoteController, monitor=False, enable_learning=False,
+                    dc_emulation_max_cpu=MAX_CU_NET,
+                    dc_emulation_max_mem=MAX_MU_NET)
 
     # reg = ResourceModelRegistrar(MAX_CU, MAX_MU)
-    # rm = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    rm = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
     # reg.register("homogeneous_rm", rm)
 
     # add 3 servers
@@ -69,9 +73,9 @@ def prepareDC():
     chain_server1 = net.addDatacenter('chain-server1')
     chain_server2 = net.addDatacenter('chain-server2')
 
-    # off_cloud.assignResourceModel(rm)
-    # chain_server1.assignResourceModel(rm)
-    # chain_server2.assignResourceModel(rm)
+    off_cloud.assignResourceModel(rm)
+    chain_server1.assignResourceModel(rm)
+    chain_server2.assignResourceModel(rm)
 
     # connect data centers with switches
     tor1 = net.addSwitch('tor1')
@@ -106,15 +110,17 @@ def scaleOut():
     cmds = []
     net, api, dcs = prepareDC()
     off_cloud_c, cs1, off_cloud_s = dcs[0], dcs[1], dcs[2]
-    fl = "large"
+    fl = "xlarge"
 
     # create client with one interface
     client = off_cloud_c.startCompute("client", image='knodir/client',
+                                      flavor_name=fl,
                                       network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
     client.sendCmd('sudo ifconfig intf1 hw ether 00:00:00:00:00:1')
     # create NAT VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     nat = cs1.startCompute("nat", image='knodir/nat',
+                           flavor_name=fl,
                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
                                     {'id': 'output', 'ip': '10.0.1.4/24'}])
     nat.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:2')
@@ -124,6 +130,7 @@ def scaleOut():
     # 'output' interface for the 'ids' VNF. Both interfaces are bridged to
     # ovs1 bridge. knodir/sonata-fw-vnf has OVS and Ryu controller.
     fw = cs1.startCompute("fw", image='knodir/sonata-fw-fixed',
+                          flavor_name=fl,
                           network=[{'id': 'input', 'ip': '10.0.1.5/24'},
                                    {'id': 'output-ids', 'ip': '10.0.1.60/24'},
                                    # {'id': 'output-ids2', 'ip': '10.0.1.61/24'},
@@ -135,6 +142,7 @@ def scaleOut():
     # create ids VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
     ids1 = cs1.startCompute("ids1", image='knodir/snort-trusty',
+                            flavor_name=fl,
                             network=[{'id': 'input', 'ip': '10.0.1.70/24'},
                                      {'id': 'output', 'ip': '10.0.1.80/24'}])
     # ids2 = cs1.startCompute("ids2", image='knodir/snort-xenial',
@@ -146,6 +154,7 @@ def scaleOut():
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     vpn = cs1.startCompute("vpn", image='knodir/vpn-client',
+                           flavor_name=fl,
                            network=[{'id': 'input-ids1', 'ip': '10.0.1.90/24'},
                                     # {'id': 'input-ids2', 'ip': '10.0.1.91/24'},
                                     {'id': 'input-fw', 'ip': '10.0.1.92/24'},
@@ -160,6 +169,7 @@ def scaleOut():
     # address. So, if you change this address make sure it is changed inside
     # client.ovpn file as well as subprocess mn.vpn route injection call below.
     server = off_cloud_s.startCompute("server", image='knodir/vpn-server',
+                                      flavor_name=fl,
                                       network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
     server.sendCmd('sudo ifconfig intf2 hw ether 00:00:00:00:00:12')
     # net.stop()
@@ -388,46 +398,16 @@ def clean_stale(cmds):
 
     return cmds
 
-
-def clean_and_save(cmds, testName):
-
-    cmds.append('sudo docker exec -i mn.client /bin/bash -c "pkill tcpreplay"')
-
-    print('wait 3s for iperf client and other processes terminate')
-    time.sleep(3)
-    # kill dstat daemons, they runs as python2 process.
-    cmds.append('sudo docker exec -i mn.client /bin/bash -c "pkill python2"')
-    cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "pkill python2"')
-    cmds.append('sudo docker exec -i mn.ids2 /bin/bash -c "pkill python2"')
-    cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "pkill python2"')
-    # copy the iperf client output file to the local machine
-    # cmds.append('sudo docker cp mn.client:/tmp/iperf3.json ./output/from-client.json')
-    cmds.append('sudo docker cp mn.client:/tmp/dstat.csv ./results/' + testName + '-from-client.csv')
-    cmds.append('sudo docker cp mn.ids1:/tmp/dstat.csv ./results/' + testName + '-from-ids1.csv')
-    cmds.append('sudo docker cp mn.ids2:/tmp/dstat.csv ./results/' + testName + '-from-ids2.csv')
-    cmds.append('sudo docker cp mn.vpn:/tmp/dstat.csv ./results/' + testName + '-from-vpn.csv')
-    # do remaining cleanup inside containers
-    # cmds.append('sudo docker exec -i mn.server /bin/bash -c "pkill iperf3"')
-
-    for cmd in cmds:
-        execStatus = subprocess.call(cmd, shell=True)
-        print('returned %d from %s (0 is success)' % (execStatus, cmd))
-
-    cmds[:] = []
-
-    return cmds
-
-
 def benchmark(multiplier):
     """ Start traffic generation. """
     # list of commands to execute one-by-one
     cmds = []
     # clean stale programs and remove old files
-    cmds.append('sudo rm ./results/scaleout' +
+    cmds.append('sudo rm ./results/scaleout/' +
                 str(multiplier / 10**6) + '-from-client.csv')
-    cmds.append('sudo rm ./results/scaleout' +
+    cmds.append('sudo rm ./results/scaleout/' +
                 str(multiplier / 10**6) + '-from-ids1.csv')
-    cmds.append('sudo rm ./results/scaleout' +
+    cmds.append('sudo rm ./results/scaleout/' +
                 str(multiplier / 10**6) + '-from-vpn.csv')
 
     cmds = clean_stale(cmds)
@@ -439,19 +419,19 @@ def benchmark(multiplier):
     # cmds.append('sudo docker exec -i mn.client /bin/bash -c "dstat --net --time -N intf1 --bits --output /tmp/dstat.csv" &')
     # cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "dstat --net --time -N input --bits --output /tmp/dstat.csv" &')
     # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "dstat --net --time -N input-fw --bits --output /tmp/dstat.csv" &')
-    cmds.append('sudo timeout 70 dstat --net --time -N dc1.s1-eth1 --nocolor --output ./results/scaleout' +
+    cmds.append('sudo timeout 70 dstat --net --time -N dc1.s1-eth1 --nocolor --output ./results/scaleout/' +
                 str(multiplier / 10**6) + '-from-client.csv &')
-    cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth7 --nocolor --output ./results/scaleout' +
+    cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth7 --nocolor --output ./results/scaleout/' +
                 str(multiplier / 10**6) + '-from-ids1.csv &')
-    cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth4 --nocolor --output ./results/scaleout' +
+    cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth4 --nocolor --output ./results/scaleout/' +
                 str(multiplier / 10**6) + '-from-vpn.csv &')
 
     # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
-    cmds.append('sudo timeout 70  docker exec -i mn.client /bin/bash -c "tcpreplay --loop=0 --mbps=' +
-                str(multiplier / 10**6) + ' -d 1 --intf1=intf1 /ftp.ready.pcap" &')
+    cmds.append('sudo timeout 70  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache --loop=0 --mbps=' +
+                str(multiplier / 2 * 10**6) + ' -d 1 --intf1=intf1 /ftp.ready.pcap" &')
     # each loop is around 40s for 10 Mbps speed, 2 loops easily make 1m
-    cmds.append('sudo timeout 70  docker exec -i mn.client /bin/bash -c "tcpreplay --loop=0 --mbps=' +
-                str(multiplier / 10**6) + ' -d 1 --intf1=intf1 /output.pcap" &')
+    cmds.append('sudo timeout 70  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache --loop=0 --mbps=' +
+                str(multiplier / 2 * 10**6) + ' -d 1 --intf1=intf1 /output.pcap" &')
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)

@@ -12,6 +12,7 @@ from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
 from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM
 
 from mininet.node import RemoteController
+from mininet.node import DefaultController
 from mininet.clean import cleanup
 
 
@@ -61,10 +62,10 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     # because of the contention between OVS and cgroup mem limitation) and
     # Sonata VM OOM killer starts killing random processes.
 
-    net = DCNetwork(controller=RemoteController, monitor=True,
+    net = DCNetwork(controller=DefaultController, monitor=False,
                     dc_emulation_max_cpu=max_cu_net,
                     dc_emulation_max_mem=max_mu_net,
-                    enable_learning=True)
+                    enable_learning=False)
 
     # Read physical topology from file. Note that cpu/ram/bandwidth numbers in
     # .pn file does not really matter. We just use server names and server to
@@ -505,21 +506,28 @@ if __name__ == '__main__':
     # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
     # max_cu_net = 600 => 10 dc_cu x 60 physical cores
 
-    # e2-azure-1rack-50servers
-    vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
-    pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
-    net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 0.90, 417792)
+    if sys.argv[1] == "nss":
+        # e2-nss-1rack-8servers
+        pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
+        vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
+    else:
+        # e2-azure-1rack-50servers
+        vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
+        pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
+    algos = ['daisy', 'random', 'packing']
+    bandwidths = [10]
+    if sys.argv[1] == "nss":
+        net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
+    else:
+        net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 1000, 417792)
 
     # start API and containernet
     api.start()
     net.start()
 
-    # allocate servers (Sonata DC construct) to place chains
-    # we use 'random' and 'packing' terminology as E2 uses (see fig. 9)
-    algos = ['netsolver', 'random', 'packing']
-    allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
-    #allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
-    #allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
+    #allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
+    # allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
+    allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
     num_of_chains = 0
     for alloc in allocs:
         if alloc.startswith('allocation'):
