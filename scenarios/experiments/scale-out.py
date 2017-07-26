@@ -197,8 +197,8 @@ def scaleOut():
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from fw start.sh start (0 is success)' % execStatus)
 
-    # os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
-    os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
+    os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
+    # os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
     os.system("sudo docker update --cpu-shares 200000 mn.fw")
 
     print('> sleeping 2s to wait ryu controller initialize')
@@ -443,7 +443,7 @@ def clean_stale(cmds):
 def benchmark(multiplier):
     """ Start traffic generation. """
     # list of commands to execute one-by-one
-    test_time = 60
+    test_time = 300
     cmds = []
     # clean stale programs and remove old files
     print("Benchmarking %d Mbps...", multiplier / 10**6)
@@ -533,15 +533,15 @@ if __name__ == '__main__':
 
     net = scaleOut()
     print("Done with scaleout!")
-    # print('Running 10 Mbps')
-    # benchmark(10**7)
+    print('Running 10 Mbps')
+    benchmark(10**7)
     print('Running 100 Mbps')
     benchmark(10**8)
     print('Running 1000 Mbps')
     benchmark(10**9)
     print('Running 10000 Mbps')
     benchmark(10**10)
-    net.CLI()
+    # net.CLI()
     net.stop()
     cleanup()
     os.system("sudo ../clean-stale.sh")

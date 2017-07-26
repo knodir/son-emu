@@ -56,7 +56,7 @@ def extract_dstat(fname, pos, omit_sec, duration):
 
 def plot_upgrade(mbps):
     # amount of seconds to skip data collection, and duration of the experiment
-    omit_sec, duration = 0, 300
+    omit_sec, duration = 0, 60
     # for client we monitor TX traffic, which is the value on the 2nd position
     # of the CSV file.
     client_bw = extract_dstat('./results/upgrade/' +

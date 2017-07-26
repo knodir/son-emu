@@ -159,8 +159,6 @@ def nodeUpgrade():
                                      {'id': 'output', 'ip': '10.0.1.81/24'}])
     ids2.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:7')
     ids2.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:8')
-    os.system("sudo docker update --cpus 64 mn.ids2")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.ids2")
 
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
@@ -191,8 +189,8 @@ def nodeUpgrade():
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from fw start.sh start (0 is success)' % execStatus)
 
-    os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
-    # os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
+    os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 mn.client mn.nat mn.fw mn.ids1 mn.ids2 mn.vpn mn.server")
+    # os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.ids2 mn.vpn mn.server")
     os.system("sudo docker update --cpu-shares 200000 mn.fw")
 
     print('> sleeping 2s to wait ryu controller initialize')
@@ -399,7 +397,7 @@ def switch_ids_back():
 def benchmark(multiplier):
     """ Start traffic generation. """
     # list of commands to execute one-by-one
-    test_time = 60
+    test_time = 300
     cmds = []
     # clean stale programs and remove old files
     print("Benchmarking %d Mbps...", multiplier / 10**6)
@@ -489,7 +487,7 @@ if __name__ == '__main__':
     benchmark(10**9)
     print('Running 10000 Mbps')
     benchmark(10**10)
-    net.CLI()
+    # net.CLI()
     net.stop()
     cleanup()
     os.system("sudo ../clean-stale.sh")
