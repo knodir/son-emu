@@ -120,8 +120,6 @@ def nodeUpgrade():
                                     flavor_name=fl,
                                     network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
     client.sendCmd('sudo ifconfig intf1 hw ether 00:00:00:00:00:1')
-    os.system("sudo docker update --cpus 64 mn.client")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.client")
 
     # create NAT VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
@@ -131,8 +129,6 @@ def nodeUpgrade():
                                     {'id': 'output', 'ip': '10.0.1.4/24'}])
     nat.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:2')
     nat.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:3')
-    os.system("sudo docker update --cpus 64 mn.nat")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.nat")
 
     # create fw VNF with two interfaces. 'input' interface for 'client' and
     # 'output' interface for the 'ids' VNF. Both interfaces are bridged to
@@ -147,8 +143,6 @@ def nodeUpgrade():
     fw.sendCmd('sudo ifconfig output-ids1 hw ether 00:00:00:00:00:05')
     fw.sendCmd('sudo ifconfig output-ids2 hw ether 00:00:00:00:01:05')
     fw.sendCmd('sudo ifconfig output-vpn hw ether 00:00:00:00:00:6')
-    os.system("sudo docker update --cpus 64 mn.fw")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.fw")
 
     # create ids VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
@@ -158,8 +152,6 @@ def nodeUpgrade():
                                      {'id': 'output', 'ip': '10.0.1.80/24'}])
     ids1.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:7')
     ids1.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:8')
-    os.system("sudo docker update --cpus 64 mn.ids1")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.ids1")
 
     ids2 = cs1.startCompute("ids2", image='knodir/snort-xenial',
                             flavor_name=fl,
@@ -181,8 +173,6 @@ def nodeUpgrade():
     vpn.sendCmd('sudo ifconfig input-ids1 hw ether 00:00:00:00:00:9')
     vpn.sendCmd('sudo ifconfig input-fw hw ether 00:00:00:00:00:10')
     vpn.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:11')
-    os.system("sudo docker update --cpus 64 mn.vpn")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.vpn")
 
     # create server VNF with one interface. Do not change assigned 10.0.10.10/24
     # address of the server. It is the address VPN clients use to connect to the
@@ -194,14 +184,16 @@ def nodeUpgrade():
                                     flavor_name=fl,
                                     network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
     server.sendCmd('sudo ifconfig intf2 hw ether 00:00:00:00:00:12')
-    os.system("sudo docker update --cpus 64 mn.server")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.server")
 
     # execute /start.sh script inside firewall Docker image. It starts Ryu
     # controller and OVS with proper configuration.
     cmd = 'sudo docker exec -i mn.fw /bin/bash /root/start.sh &'
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from fw start.sh start (0 is success)' % execStatus)
+
+    os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
+    # os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
+    os.system("sudo docker update --cpu-shares 200000 mn.fw")
 
     print('> sleeping 2s to wait ryu controller initialize')
     time.sleep(2)
@@ -366,7 +358,7 @@ def switch_ids():
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=2,out_port=1"')
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=1,action=output:3"')
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=3,action=output:1"')
-    # little hack to enforce immediate impact of the new OVS rule
+    # # little hack to enforce immediate impact of the new OVS rule
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ip link set output-ids1 down && ip link set output-ids1 up"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route del -net 10.0.1.0/24 dev input-ids1"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.1.0/24 dev input-ids2"')
@@ -388,15 +380,14 @@ def switch_ids_back():
 
     cmds = []
 
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=1,out_port=2"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=2,out_port=1"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=1,action=output:3"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=3,action=output:1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=1,out_port=3"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=3,out_port=1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=1,action=output:2"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=2,action=output:1"')
     # little hack to enforce immediate impact of the new OVS rule
-    # cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ip link set output-ids2 down && ip link set output-ids2 up"')
-
-    # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route del -net 10.0.1.0/24 dev input-ids2"')
-    # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.1.0/24 dev input-ids1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ip link set output-ids2 down && ip link set output-ids2 up"')
+    cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route del -net 10.0.1.0/24 dev input-ids2"')
+    cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.1.0/24 dev input-ids1"')
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -408,7 +399,7 @@ def switch_ids_back():
 def benchmark(multiplier):
     """ Start traffic generation. """
     # list of commands to execute one-by-one
-    test_time = 300
+    test_time = 60
     cmds = []
     # clean stale programs and remove old files
     print("Benchmarking %d Mbps...", multiplier / 10**6)
@@ -464,7 +455,7 @@ def benchmark(multiplier):
         execStatus = subprocess.call(cmd, shell=True)
         print('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
-  
+
     # start ids switch functionality which triggers after 10s
     print('switch_ids() activated, waiting 50s before trigger')
     time.sleep(test_time / 2)
@@ -481,6 +472,7 @@ def benchmark(multiplier):
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
         print('returned %d from %s (0 is success)' % (execStatus, cmd))
+    switch_ids_back()
     print('done')
 
 

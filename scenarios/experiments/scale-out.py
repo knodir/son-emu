@@ -120,8 +120,8 @@ def scaleOut():
                                     # flavor_name=fl,
                                     network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
     client.sendCmd('sudo ifconfig intf1 hw ether 00:00:00:00:00:1')
-    os.system("sudo docker update --cpus 64 mn.client")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.client")
+    # os.system("sudo docker update --cpuset-cpus 0-63 --cpus 64 mn.client")
+    os.system("sudo docker update --cpuset-cpus 0-7 --cpus 8 mn.client")
 
     # create NAT VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
@@ -131,8 +131,8 @@ def scaleOut():
                                     {'id': 'output', 'ip': '10.0.1.4/24'}])
     nat.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:2')
     nat.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:3')
-    os.system("sudo docker update --cpus 64 mn.nat")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.nat")
+    # os.system("sudo docker update --cpuset-cpus 0-63 --cpus 64 mn.nat")
+    os.system("sudo docker update --cpuset-cpus 0-7 --cpus 8 mn.nat")
 
     # create fw VNF with two interfaces. 'input' interface for 'client' and
     # 'output' interface for the 'ids' VNF. Both interfaces are bridged to
@@ -146,8 +146,8 @@ def scaleOut():
     fw.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:4')
     fw.sendCmd('sudo ifconfig output-ids hw ether 00:00:00:00:00:5')
     fw.sendCmd('sudo ifconfig output-vpn hw ether 00:00:00:00:00:6')
-    os.system("sudo docker update --cpus 64 mn.fw")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.fw")
+    # os.system("sudo docker update --cpuset-cpus 0-63 --cpus 64 --cpu-shares 200000 mn.fw")
+    os.system("sudo docker update --cpuset-cpus 0-7 --cpus 8 --cpu-shares 200000 mn.fw")
 
     # create ids VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
@@ -161,8 +161,8 @@ def scaleOut():
     #                                  {'id': 'output', 'ip': '10.0.1.81/24'}])
     ids1.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:7')
     ids1.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:8')
-    os.system("sudo docker update --cpus 64 mn.ids1")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.ids1")
+    # os.system("sudo docker update --cpuset-cpus 0-63 --cpus 64 mn.ids1")
+    os.system("sudo docker update --cpuset-cpus 0-7 --cpus 8 mn.ids1")
 
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
@@ -175,8 +175,8 @@ def scaleOut():
     vpn.sendCmd('sudo ifconfig input-ids1 hw ether 00:00:00:00:00:9')
     vpn.sendCmd('sudo ifconfig input-fw hw ether 00:00:00:00:00:10')
     vpn.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:11')
-    os.system("sudo docker update --cpus 64 mn.vpn")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.vpn")
+    # os.system("sudo docker update --cpuset-cpus 0-63 --cpus 64 mn.vpn")
+    os.system("sudo docker update --cpuset-cpus 0-7 --cpus 8 mn.vpn")
 
     # create server VNF with one interface. Do not change assigned 10.0.10.10/24
     # address of the server. It is the address VPN clients use to connect to the
@@ -188,14 +188,18 @@ def scaleOut():
                                     # flavor_name=fl,
                                     network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
     server.sendCmd('sudo ifconfig intf2 hw ether 00:00:00:00:00:12')
-    os.system("sudo docker update --cpus 64 mn.server")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.server")
+    # os.system("sudo docker update --cpuset-cpus 0-63 --cpus 64 mn.server")
+    os.system("sudo docker update --cpuset-cpus 0-7 --cpus 8 mn.server")
 
     # execute /start.sh script inside firewall Docker image. It starts Ryu
     # controller and OVS with proper configuration.
     cmd = 'sudo docker exec -i mn.fw /bin/bash /root/start.sh &'
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from fw start.sh start (0 is success)' % execStatus)
+
+    # os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
+    os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
+    os.system("sudo docker update --cpu-shares 200000 mn.fw")
 
     print('> sleeping 2s to wait ryu controller initialize')
     time.sleep(2)
@@ -439,7 +443,7 @@ def clean_stale(cmds):
 def benchmark(multiplier):
     """ Start traffic generation. """
     # list of commands to execute one-by-one
-    test_time = 300
+    test_time = 60
     cmds = []
     # clean stale programs and remove old files
     print("Benchmarking %d Mbps...", multiplier / 10**6)

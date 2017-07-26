@@ -56,7 +56,7 @@ def extract_dstat(fname, pos, omit_sec, duration):
 
 def plot_upgrade(mbps):
     # amount of seconds to skip data collection, and duration of the experiment
-    omit_sec, duration = 0, 60
+    omit_sec, duration = 0, 300
     # for client we monitor TX traffic, which is the value on the 2nd position
     # of the CSV file.
     client_bw = extract_dstat('./results/upgrade/' +
@@ -105,10 +105,10 @@ def plot_upgrade(mbps):
     client = plt.plot(t, client_bw, 'r--', label='Client')
     ids1 = plt.plot(t, ids1_bw, 'g--', label='IDS1')
     ids2 = plt.plot(t, ids2_bw, 'y--', label='IDS2')
-    vpn_fw = plt.plot(t, vpn_fw_bw, 'b--', label='VPN-FW')
+    # vpn_fw = plt.plot(t, vpn_fw_bw, 'b--', label='VPN-FW')
     merged_server = plt.plot(t, merged_server_bw, 'k--', label='Server')
     # server = plt.plot(t, server_bw, 'b--', label='Server')
-    ax.legend(loc='upper left', bbox_to_anchor=(0, 1.2), numpoints=1, ncol=5,
+    ax.legend(loc='upper left', bbox_to_anchor=(0, 1.2), numpoints=1, ncol=4,
               frameon=False)
     plt.draw()
     final_figure = plt.gcf()
