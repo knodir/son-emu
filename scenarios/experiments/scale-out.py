@@ -529,8 +529,8 @@ if __name__ == '__main__':
 
     net = scaleOut()
     print("Done with scaleout!")
-    print('Running 10 Mbps')
-    benchmark(10**7)
+    # print('Running 10 Mbps')
+    # benchmark(10**7)
     print('Running 100 Mbps')
     benchmark(10**8)
     print('Running 1000 Mbps')

@@ -167,8 +167,8 @@ def nodeUpgrade():
                                      {'id': 'output', 'ip': '10.0.1.81/24'}])
     ids2.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:7')
     ids2.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:8')
-    os.system("sudo docker update --cpus 64 mn.ids1")
-    os.system("sudo docker update --cpuset-cpus 0-63 mn.ids1")
+    os.system("sudo docker update --cpus 64 mn.ids2")
+    os.system("sudo docker update --cpuset-cpus 0-63 mn.ids2")
 
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
@@ -213,10 +213,9 @@ def nodeUpgrade():
     cmd = 'sudo docker exec -i mn.ids1 /bin/bash -c "sh /start.sh"'
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from ids1 start.sh start (0 is success)' % execStatus)
-
-    # cmd = 'sudo docker exec -i mn.ids2 /bin/bash -c "sh /start.sh"'
-    # execStatus = subprocess.call(cmd, shell=True)
-    # print('returned %d from ids2 start.sh start (0 is success)' % execStatus)
+    cmd = 'sudo docker exec -i mn.ids2 /bin/bash -c "sh /start.sh"'
+    execStatus = subprocess.call(cmd, shell=True)
+    print('returned %d from ids2 start.sh start (0 is success)' % execStatus)
 
     # execute /start.sh script inside nat image. It attaches both input
     # and output interfaces to OVS bridge to enable packet forwarding.
@@ -261,8 +260,8 @@ def nodeUpgrade():
         print('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
-    print('> sleeping 60s to VPN client initialize...')
-    time.sleep(60)
+    print('> sleeping 5 to VPN client initialize...')
+    time.sleep(5)
     print('< wait complete')
     print('VPN client VNF started')
 
@@ -389,15 +388,15 @@ def switch_ids_back():
 
     cmds = []
 
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs1 in_port=1,out_port=3"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs1 in_port=3,out_port=1"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs1 priority=2,in_port=1,action=output:2"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs1 priority=2,in_port=2,action=output:1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=1,out_port=2"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=2,out_port=1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=1,action=output:3"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=3,action=output:1"')
     # little hack to enforce immediate impact of the new OVS rule
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ip link set output-ids2 down && ip link set output-ids2 up"')
+    # cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ip link set output-ids2 down && ip link set output-ids2 up"')
 
-    cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route del -net 10.0.1.0/24 dev input-ids2"')
-    cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.1.0/24 dev input-ids1"')
+    # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route del -net 10.0.1.0/24 dev input-ids2"')
+    # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.1.0/24 dev input-ids1"')
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -413,19 +412,19 @@ def benchmark(multiplier):
     cmds = []
     # clean stale programs and remove old files
     print("Benchmarking %d Mbps...", multiplier / 10**6)
-    cmds.append('sudo rm ./results/scaleout/' +
+    cmds.append('sudo rm ./results/upgrade/' +
                 str(multiplier / 10**6) + '-from-client.csv')
-    cmds.append('sudo rm ./results/scaleout/' +
+    cmds.append('sudo rm ./results/upgrade/' +
                 str(multiplier / 10**6) + '-from-ids1.csv')
-    cmds.append('sudo rm ./results/scaleout/' +
+    cmds.append('sudo rm ./results/upgrade/' +
                 str(multiplier / 10**6) + '-from-ids2.csv')
-    cmds.append('sudo rm ./results/scaleout/' +
+    cmds.append('sudo rm ./results/upgrade/' +
                 str(multiplier / 10**6) + '-from-vpn-fw.csv')
-    cmds.append('sudo rm ./results/scaleout/' +
+    cmds.append('sudo rm ./results/upgrade/' +
                 str(multiplier / 10**6) + '-from-vpn-ids1.csv')
-    cmds.append('sudo rm ./results/scaleout/' +
+    cmds.append('sudo rm ./results/upgrade/' +
                 str(multiplier / 10**6) + '-from-vpn-ids2.csv')
-    cmds.append('sudo rm ./results/scaleout/' +
+    cmds.append('sudo rm ./results/upgrade/' +
                 str(multiplier / 10**6) + '-from-server.csv')
     cmds = clean_stale(cmds)
 
@@ -436,57 +435,47 @@ def benchmark(multiplier):
     # cmds.append('sudo docker exec -i mn.client /bin/bash -c "dstat --net --time -N intf1 --bits --output /tmp/dstat.csv" &')
     # cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "dstat --net --time -N input --bits --output /tmp/dstat.csv" &')
     # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "dstat --net --time -N input-fw --bits --output /tmp/dstat.csv" &')
-    cmd = 'sudo timeout %d dstat --net --time -N dc1.s1-eth2 --nocolor --output ./results/scaleout/%d-from-client.csv &' % (
+    cmd = 'sudo timeout %d dstat --net --time -N dc1.s1-eth2 --nocolor --output ./results/upgrade/%d-from-client.csv &' % (
         test_time, (multiplier / 10**6))
     cmds.append(cmd)
-    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth8 --nocolor --output ./results/scaleout/%d-from-ids.csv &' % (
+    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth8 --nocolor --output ./results/upgrade/%d-from-ids1.csv &' % (
         test_time, (multiplier / 10**6))
     cmds.append(cmd)
-    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth10 --nocolor --output ./results/scaleout/%d-from-ids.csv &' % (
+    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth10 --nocolor --output ./results/upgrade/%d-from-ids2.csv &' % (
         test_time, (multiplier / 10**6))
     cmds.append(cmd)
-    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth12 --nocolor --output ./results/scaleout/%d-from-vpn-ids1.csv &' % (
+    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth12 --nocolor --output ./results/upgrade/%d-from-vpn-ids1.csv &' % (
         test_time, (multiplier / 10**6))
     cmds.append(cmd)
-    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth13 --nocolor --output ./results/scaleout/%d-from-vpn-ids2.csv &' % (
+    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth13 --nocolor --output ./results/upgrade/%d-from-vpn-ids2.csv &' % (
         test_time, (multiplier / 10**6))
     cmds.append(cmd)
-    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth14 --nocolor --output ./results/scaleout/%d-from-vpn-fw.csv &' % (
+    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth14 --nocolor --output ./results/upgrade/%d-from-vpn-fw.csv &' % (
         test_time, (multiplier / 10**6))
     cmds.append(cmd)
 
     cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
     --loop=0 --mbps=%d -d 1 --intf1=intf1 /ftp.ready.pcap" &' % (test_time, (multiplier / 10**7))
     cmds.append(cmd)
-
+    cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
+    --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**7))
+    cmds.append(cmd)
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
         print('returned %d from %s (0 is success)' % (execStatus, cmd))
-
     cmds[:] = []
-
-    print('wait 3s for iperf server and other processes initialize')
-    time.sleep(3)
-    cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
-    --loop=0 --mbps=%d -d 1 --intf1=intf1 /ftp.ready.pcap" &' % (test_time, (multiplier / 10**7))
-    cmds.append(cmd)
+  
     # start ids switch functionality which triggers after 10s
     print('switch_ids() activated, waiting 50s before trigger')
     time.sleep(test_time / 2)
     print('switch_ids() wait complete. Trigger the IDS switch.')
-    thread.start_new_thread(switch_ids, ())
+    switch_ids()
 
-    # start iperf client or replay enterprise traces
-    # cmd = 'sudo docker exec -i mn.client /bin/bash -c "iperf3 -c 10.8.0.1 -t 60 -b 10M --no-delay --omit 0 --json --logfile /tmp/iperf3.json"'
-    # each loop is around 40s for 10 Mbps speed, 2 loops easily make 1m
-    cmd = 'sudo timeout 120 docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache --loop=0 --mbps=' + \
-        str(multiplier / 10**6) + ' -d 1 --intf1=intf1 /output.pcap" &'
-    execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from %s (0 is success)' % (execStatus, cmd))
     print("Wait %d seconds for the test to complete" % (test_time / 2 + 10))
     time.sleep(test_time / 2 + 10)
     # clean and save the results in csv file named after the test
-    cmds = clean_and_save(cmds, multiplier)
+    # cmds = clean_and_save(cmds, multiplier)
     cmds.append('sudo killall dstat')
     cmds.append('sudo killall tcpreplay')
     for cmd in cmds:
@@ -496,7 +485,7 @@ def benchmark(multiplier):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     net = nodeUpgrade()
     print("Done with upgrade!")

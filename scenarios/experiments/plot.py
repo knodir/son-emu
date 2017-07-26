@@ -56,44 +56,59 @@ def extract_dstat(fname, pos, omit_sec, duration):
 
 def plot_upgrade(mbps):
     # amount of seconds to skip data collection, and duration of the experiment
-    omit_sec, duration = 3, 74
+    omit_sec, duration = 0, 60
     # for client we monitor TX traffic, which is the value on the 2nd position
     # of the CSV file.
     client_bw = extract_dstat('./results/upgrade/' +
-                              str(mbps) + '-from-client.csv', 2, omit_sec,
+                              str(mbps) + '-from-client.csv', 1, omit_sec,
                               duration)
     print('client_bw = %s, len = %d' % (client_bw, len(client_bw)))
 
     # for all other VNFs we monitor RX traffic, which is the value on the 1st
     # position of the CSV file.
     ids1_bw = extract_dstat('./results/upgrade/' +
-                            str(mbps) + '-from-ids1.csv', 1, omit_sec,
+                            str(mbps) + '-from-ids1.csv', 2, omit_sec,
                             duration)
-    print('ids1_bw = %s, len = %d' % (ids1_bw, len(ids1_bw)))
+    print('ids_bw = %s, len = %d' % (ids1_bw, len(ids1_bw)))
 
     ids2_bw = extract_dstat('./results/upgrade/' +
-                            str(mbps) + '-from-ids2.csv', 1, omit_sec,
+                            str(mbps) + '-from-ids2.csv', 2, omit_sec,
                             duration)
-    print('ids2_bw = %s, len = %d' % (ids2_bw, len(ids2_bw)))
+    print('ids_bw = %s, len = %d' % (ids2_bw, len(ids2_bw)))
 
-    vpn_bw = extract_dstat('./results/upgrade/' +
-                           str(mbps) + '-from-vpn.csv', 1, omit_sec,
-                           duration)
-    print('vpn_bw = %s, len = %d' % (vpn_bw, len(vpn_bw)))
+    vpn_ids1_bw = extract_dstat('./results/upgrade/' +
+                                str(mbps) + '-from-vpn-ids1.csv', 2, omit_sec,
+                                duration)
+    print('vpn_bw = %s, len = %d' % (vpn_ids1_bw, len(vpn_ids1_bw)))
+
+    vpn_ids2_bw = extract_dstat('./results/upgrade/' +
+                                str(mbps) + '-from-vpn-ids2.csv', 2, omit_sec,
+                                duration)
+    print('vpn_bw = %s, len = %d' % (vpn_ids2_bw, len(vpn_ids2_bw)))
+
+    vpn_fw_bw = extract_dstat('./results/upgrade/' +
+                              str(mbps) + '-from-vpn-fw.csv', 2, omit_sec,
+                              duration)
+    print('server_bw = %s, len = %d' % (vpn_fw_bw, len(vpn_fw_bw)))
 
     figure_name = 'results/upgrade' + str(mbps) + '.png'
-    t = np.arange(0.0, 74, 1)
+    t = np.arange(0.0, duration, 1)
+    merged_server_bw = [x + y for x, y in zip(vpn_ids1_bw, vpn_fw_bw)]
+    merged_server_bw = [x + y for x, y in zip(vpn_ids2_bw, merged_server_bw)]
 
     # Plots the figure
     fig, ax = plt.subplots(figsize=(8, 4))
     axes = plt.gca()
     plt.xlabel('Time (s)')
     plt.ylabel('Bandwidth (Mbps)')
+    plt.ylim([0, mbps * 0.35])
     client = plt.plot(t, client_bw, 'r--', label='Client')
     ids1 = plt.plot(t, ids1_bw, 'g--', label='IDS1')
-    ids2 = plt.plot(t, ids2_bw, 'b--', label='IDS2')
-    vpn = plt.plot(t, vpn_bw, 'k--', label='VPN')
-    ax.legend(loc='upper left', bbox_to_anchor=(0, 1.2), numpoints=1, ncol=4,
+    ids2 = plt.plot(t, ids2_bw, 'y--', label='IDS2')
+    vpn_fw = plt.plot(t, vpn_fw_bw, 'b--', label='VPN-FW')
+    merged_server = plt.plot(t, merged_server_bw, 'k--', label='Server')
+    # server = plt.plot(t, server_bw, 'b--', label='Server')
+    ax.legend(loc='upper left', bbox_to_anchor=(0, 1.2), numpoints=1, ncol=5,
               frameon=False)
     plt.draw()
     final_figure = plt.gcf()
@@ -137,7 +152,7 @@ def plot_scaleout(mbps):
     axes = plt.gca()
     plt.xlabel('Time (s)')
     plt.ylabel('Bandwidth (Mbps)')
-    plt.ylim([0, mbps / 2])
+    plt.ylim([0, mbps * 0.35])
     client = plt.plot(t, client_bw, 'r--', label='Client')
     ids = plt.plot(t, ids_bw, 'g--', label='IDS')
     vpn_fw = plt.plot(t, vpn_fw_bw, 'b--', label='VPN-FW')
