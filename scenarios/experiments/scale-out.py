@@ -39,9 +39,9 @@ def prepareDC():
     # create one resource mode and use it for all servers, meaning all of our
     # servers are homogeneous. Create multiple RMs for heterogeneous servers
     # (with different amount of cpu,ram).
-    MAX_CU = 120  # max compute units
+    MAX_CU = 8  # max compute units
     MAX_MU = 30000  # max memory units
-    MAX_CU_NET = 1000
+    MAX_CU_NET = 24
     MAX_MU_NET = 400000
     # the cpu, ram resource above are consumed by VNFs with one of these
     # flavors. For some reason memory allocated for tiny flavor is 42 MB,
@@ -60,22 +60,25 @@ def prepareDC():
     # because of the contention between OVS and cgroup mem limitation) and
     # Sonata VM OOM killer starts killing random processes.
 
-    net = DCNetwork(controller=RemoteController, monitor=False, enable_learning=False,
-                    dc_emulation_max_cpu=MAX_CU_NET,
-                    dc_emulation_max_mem=MAX_MU_NET)
-
+    # net = DCNetwork(controller=RemoteController, monitor=False, enable_learning=False,
+    #                 dc_emulation_max_cpu=MAX_CU_NET,
+    #                 dc_emulation_max_mem=MAX_MU_NET)
+    net = DCNetwork(controller=RemoteController, monitor=False, enable_learning=False)
     # reg = ResourceModelRegistrar(MAX_CU, MAX_MU)
-    rm = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    # rm1 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+    # rm2 = UpbSimpleCloudDcRM(MAX_CU * 2, MAX_MU * 2)
+    # rm3 = UpbSimpleCloudDcRM(MAX_CU, MAX_MU)
+
     # reg.register("homogeneous_rm", rm)
 
     # add 3 servers
     off_cloud = net.addDatacenter('off-cloud')  # place client/server VNFs
     chain_server1 = net.addDatacenter('chain-server1')
-    chain_server2 = net.addDatacenter('chain-server2')
+    # chain_server2 = net.addDatacenter('chain-server2')
 
-    off_cloud.assignResourceModel(rm)
-    chain_server1.assignResourceModel(rm)
-    chain_server2.assignResourceModel(rm)
+    # off_cloud.assignResourceModel(rm1)
+    # chain_server1.assignResourceModel(rm2)
+    # chain_server2.assignResourceModel(rm3)
 
     # connect data centers with switches
     tor1 = net.addSwitch('tor1')
@@ -83,7 +86,7 @@ def prepareDC():
     # link data centers and switches
     net.addLink(off_cloud, tor1)
     net.addLink(chain_server1, tor1)
-    net.addLink(chain_server2, tor1)
+    # net.addLink(chain_server2, tor1)
 
     # create REST API endpoint
     api = RestApiEndpoint("0.0.0.0", 5001)
@@ -94,43 +97,48 @@ def prepareDC():
     # connect data centers to the endpoint
     api.connectDatacenter(off_cloud)
     api.connectDatacenter(chain_server1)
-    api.connectDatacenter(chain_server2)
+    # api.connectDatacenter(chain_server2)
 
     # start API and containernet
     api.start()
     net.start()
 
-    return (net, api, [off_cloud, chain_server1, chain_server2])
+    return (net, api, [off_cloud, chain_server1])
     # return (net, dc, api)
 
 
 def scaleOut():
-    """ Implements node-upgrade scenario. TBD. """
+    """ Implements scale-out scenario. TBD. """
 
     cmds = []
     net, api, dcs = prepareDC()
-    off_cloud_c, cs1, off_cloud_s = dcs[0], dcs[1], dcs[2]
-    fl = "xlarge"
+    off_cloud, cs1 = dcs[0], dcs[1]
+    fl = "ids"
 
     # create client with one interface
-    client = off_cloud_c.startCompute("client", image='knodir/client',
-                                      flavor_name=fl,
-                                      network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
+    client = off_cloud.startCompute("client", image='knodir/client',
+                                    # flavor_name=fl,
+                                    network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
     client.sendCmd('sudo ifconfig intf1 hw ether 00:00:00:00:00:1')
+    os.system("sudo docker update --cpus 64 mn.client")
+    os.system("sudo docker update --cpuset-cpus 0-63 mn.client")
+
     # create NAT VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     nat = cs1.startCompute("nat", image='knodir/nat',
-                           flavor_name=fl,
+                           # flavor_name=fl,
                            network=[{'id': 'input', 'ip': '10.0.0.3/24'},
                                     {'id': 'output', 'ip': '10.0.1.4/24'}])
     nat.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:2')
     nat.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:3')
+    os.system("sudo docker update --cpus 64 mn.nat")
+    os.system("sudo docker update --cpuset-cpus 0-63 mn.nat")
 
     # create fw VNF with two interfaces. 'input' interface for 'client' and
     # 'output' interface for the 'ids' VNF. Both interfaces are bridged to
     # ovs1 bridge. knodir/sonata-fw-vnf has OVS and Ryu controller.
     fw = cs1.startCompute("fw", image='knodir/sonata-fw-fixed',
-                          flavor_name=fl,
+                          # flavor_name=fl,
                           network=[{'id': 'input', 'ip': '10.0.1.5/24'},
                                    {'id': 'output-ids', 'ip': '10.0.1.60/24'},
                                    # {'id': 'output-ids2', 'ip': '10.0.1.61/24'},
@@ -138,23 +146,28 @@ def scaleOut():
     fw.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:4')
     fw.sendCmd('sudo ifconfig output-ids hw ether 00:00:00:00:00:5')
     fw.sendCmd('sudo ifconfig output-vpn hw ether 00:00:00:00:00:6')
+    os.system("sudo docker update --cpus 64 mn.fw")
+    os.system("sudo docker update --cpuset-cpus 0-63 mn.fw")
 
     # create ids VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
     ids1 = cs1.startCompute("ids1", image='knodir/snort-trusty',
-                            flavor_name=fl,
+                            # flavor_name=fl,
                             network=[{'id': 'input', 'ip': '10.0.1.70/24'},
                                      {'id': 'output', 'ip': '10.0.1.80/24'}])
     # ids2 = cs1.startCompute("ids2", image='knodir/snort-xenial',
-    #                         flavor_name=fl,
+    #                         # flavor_name=fl,,
     #                         network=[{'id': 'input', 'ip': '10.0.1.71/24'},
     #                                  {'id': 'output', 'ip': '10.0.1.81/24'}])
     ids1.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:7')
     ids1.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:8')
+    os.system("sudo docker update --cpus 64 mn.ids1")
+    os.system("sudo docker update --cpuset-cpus 0-63 mn.ids1")
+
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
     vpn = cs1.startCompute("vpn", image='knodir/vpn-client',
-                           flavor_name=fl,
+                           # flavor_name=fl,
                            network=[{'id': 'input-ids1', 'ip': '10.0.1.90/24'},
                                     # {'id': 'input-ids2', 'ip': '10.0.1.91/24'},
                                     {'id': 'input-fw', 'ip': '10.0.1.92/24'},
@@ -162,18 +175,21 @@ def scaleOut():
     vpn.sendCmd('sudo ifconfig input-ids1 hw ether 00:00:00:00:00:9')
     vpn.sendCmd('sudo ifconfig input-fw hw ether 00:00:00:00:00:10')
     vpn.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:11')
+    os.system("sudo docker update --cpus 64 mn.vpn")
+    os.system("sudo docker update --cpuset-cpus 0-63 mn.vpn")
+
     # create server VNF with one interface. Do not change assigned 10.0.10.10/24
     # address of the server. It is the address VPN clients use to connect to the
     # server and this address is hardcoded inside client.ovpn of the vpn-client
     # Docker image. We also remove the injected routing table entry for this
     # address. So, if you change this address make sure it is changed inside
     # client.ovpn file as well as subprocess mn.vpn route injection call below.
-    server = off_cloud_s.startCompute("server", image='knodir/vpn-server',
-                                      flavor_name=fl,
-                                      network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
+    server = off_cloud.startCompute("server", image='knodir/vpn-server',
+                                    # flavor_name=fl,
+                                    network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
     server.sendCmd('sudo ifconfig intf2 hw ether 00:00:00:00:00:12')
-    # net.stop()
-    # return
+    os.system("sudo docker update --cpus 64 mn.server")
+    os.system("sudo docker update --cpuset-cpus 0-63 mn.server")
 
     # execute /start.sh script inside firewall Docker image. It starts Ryu
     # controller and OVS with proper configuration.
@@ -181,8 +197,8 @@ def scaleOut():
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from fw start.sh start (0 is success)' % execStatus)
 
-    print('> sleeping 10s to wait ryu controller initialize')
-    time.sleep(10)
+    print('> sleeping 2s to wait ryu controller initialize')
+    time.sleep(2)
     print('< wait complete')
     print('fw start done')
 
@@ -240,8 +256,8 @@ def scaleOut():
         print('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
-    print('> sleeping 20s to VPN client initialize...')
-    time.sleep(20)
+    print('> sleeping 5 to VPN client initialize...')
+    time.sleep(5)
     print('< wait complete')
     print('VPN client VNF started')
 
@@ -276,45 +292,55 @@ def set_bw(multiplier):
     high_bw = 2 * multiplier / 10
     print("Scaling up bandwidth by %d and %d" % (low_bw, high_bw))
     sys.stdout.flush()
+    # Output DC1
     os.system('ovs-vsctl -- set Port dc1.s1-eth1 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    # Output Client
     os.system('ovs-vsctl -- set Port dc1.s1-eth2 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    # Input NAT
     os.system('ovs-vsctl -- set Port dc2.s1-eth2 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    # Output NAT
     os.system('ovs-vsctl -- set Port dc2.s1-eth3 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    # Input FW
     os.system('ovs-vsctl -- set Port dc2.s1-eth4 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    # Output FW-IDS
     os.system('ovs-vsctl -- set Port dc2.s1-eth5 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw))
+    # Output FW-VPN
     os.system('ovs-vsctl -- set Port dc2.s1-eth6 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw))
-    os.system('ovs-vsctl -- set Port dc2.s1-eth6 qos=@newqos -- \
-    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
-    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw))
+    # Input IDS
     os.system('ovs-vsctl -- set Port dc2.s1-eth7 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw))
+    # Output IDS
     os.system('ovs-vsctl -- set Port dc2.s1-eth8 qos=@newqos -- \
-    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
-    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw))
+    # Input VPN-IDS
     os.system('ovs-vsctl -- set Port dc2.s1-eth9 qos=@newqos -- \
-    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
-    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw))
+    # Input VPN-FW
     os.system('ovs-vsctl -- set Port dc2.s1-eth10 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw))
+    # Output VPN
     os.system('ovs-vsctl -- set Port dc2.s1-eth11 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    # Input Sink
     os.system('ovs-vsctl -- set Port dc3.s1-eth2 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
@@ -323,47 +349,58 @@ def set_bw(multiplier):
 def scale_bw(multiplier):
     low_bw = 2 * multiplier / 10
     high_bw = 3 * multiplier / 10
+    vpn_bw = 1 * multiplier / 10
     print("Scaling up bandwidth by %d and %d" % (low_bw, high_bw))
     sys.stdout.flush()
+    # Output DC1
     os.system('ovs-vsctl -- set Port dc1.s1-eth1 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    # Output Client
     os.system('ovs-vsctl -- set Port dc1.s1-eth2 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    # Input NAT
     os.system('ovs-vsctl -- set Port dc2.s1-eth2 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    # Output NAT
     os.system('ovs-vsctl -- set Port dc2.s1-eth3 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    # Input FW
     os.system('ovs-vsctl -- set Port dc2.s1-eth4 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    # Output FW-IDS
     os.system('ovs-vsctl -- set Port dc2.s1-eth5 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw))
+    # Output FW-VPN
     os.system('ovs-vsctl -- set Port dc2.s1-eth6 qos=@newqos -- \
-    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
-    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw))
-    os.system('ovs-vsctl -- set Port dc2.s1-eth6 qos=@newqos -- \
-    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
-    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw))
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(vpn_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(vpn_bw) + ' other-config:max-rate=' + str(vpn_bw))
+    # Input IDS
     os.system('ovs-vsctl -- set Port dc2.s1-eth7 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw))
+    # Output IDS
     os.system('ovs-vsctl -- set Port dc2.s1-eth8 qos=@newqos -- \
-    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
-    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
-    os.system('ovs-vsctl -- set Port dc2.s1-eth9 qos=@newqos -- \
-    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
-    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
-    os.system('ovs-vsctl -- set Port dc2.s1-eth10 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw))
+    # Input VPN-IDS
+    os.system('ovs-vsctl -- set Port dc2.s1-eth9 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(low_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(low_bw) + ' other-config:max-rate=' + str(low_bw))
+    # Input VPN-FW
+    os.system('ovs-vsctl -- set Port dc2.s1-eth10 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(vpn_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(vpn_bw) + ' other-config:max-rate=' + str(vpn_bw))
+    # Output VPN
     os.system('ovs-vsctl -- set Port dc2.s1-eth11 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    # Input Sink
     os.system('ovs-vsctl -- set Port dc3.s1-eth2 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
@@ -398,65 +435,97 @@ def clean_stale(cmds):
 
     return cmds
 
+
 def benchmark(multiplier):
     """ Start traffic generation. """
     # list of commands to execute one-by-one
+    test_time = 300
     cmds = []
     # clean stale programs and remove old files
+    print("Benchmarking %d Mbps...", multiplier / 10**6)
     cmds.append('sudo rm ./results/scaleout/' +
                 str(multiplier / 10**6) + '-from-client.csv')
     cmds.append('sudo rm ./results/scaleout/' +
-                str(multiplier / 10**6) + '-from-ids1.csv')
+                str(multiplier / 10**6) + '-from-ids.csv')
     cmds.append('sudo rm ./results/scaleout/' +
-                str(multiplier / 10**6) + '-from-vpn.csv')
-
+                str(multiplier / 10**6) + '-from-vpn-fw.csv')
+    cmds.append('sudo rm ./results/scaleout/' +
+                str(multiplier / 10**6) + '-from-vpn-ids.csv')
+    cmds.append('sudo rm ./results/scaleout/' +
+                str(multiplier / 10**6) + '-from-server.csv')
     cmds = clean_stale(cmds)
 
     # Set the initial bandwidth constraints of the system
-    set_bw(multiplier)
+    # set_bw(multiplier)
     time.sleep(3)
     # cmds.append('sudo docker exec -i mn.server /bin/bash -c "iperf3 -s --bind 10.8.0.1" &')
     # cmds.append('sudo docker exec -i mn.client /bin/bash -c "dstat --net --time -N intf1 --bits --output /tmp/dstat.csv" &')
     # cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "dstat --net --time -N input --bits --output /tmp/dstat.csv" &')
     # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "dstat --net --time -N input-fw --bits --output /tmp/dstat.csv" &')
-    cmds.append('sudo timeout 70 dstat --net --time -N dc1.s1-eth1 --nocolor --output ./results/scaleout/' +
-                str(multiplier / 10**6) + '-from-client.csv &')
-    cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth7 --nocolor --output ./results/scaleout/' +
-                str(multiplier / 10**6) + '-from-ids1.csv &')
-    cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth4 --nocolor --output ./results/scaleout/' +
-                str(multiplier / 10**6) + '-from-vpn.csv &')
+    cmd = 'sudo timeout %d dstat --net --time -N dc1.s1-eth2 --nocolor --output ./results/scaleout/%d-from-client.csv &' % (
+        test_time, (multiplier / 10**6))
+    cmds.append(cmd)
+    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth7 --nocolor --output ./results/scaleout/%d-from-ids.csv &' % (
+        test_time, (multiplier / 10**6))
+    cmds.append(cmd)
+    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth9 --nocolor --output ./results/scaleout/%d-from-vpn-ids.csv &' % (
+        test_time, (multiplier / 10**6))
+    cmds.append(cmd)
+    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth10 --nocolor --output ./results/scaleout/%d-from-vpn-fw.csv &' % (
+        test_time, (multiplier / 10**6))
+    cmds.append(cmd)
 
-    # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
-    cmds.append('sudo timeout 70  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache --loop=0 --mbps=' +
-                str(multiplier / 2 * 10**6) + ' -d 1 --intf1=intf1 /ftp.ready.pcap" &')
-    # each loop is around 40s for 10 Mbps speed, 2 loops easily make 1m
-    cmds.append('sudo timeout 70  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache --loop=0 --mbps=' +
-                str(multiplier / 2 * 10**6) + ' -d 1 --intf1=intf1 /output.pcap" &')
+    # cmds.append('sudo timeout 70 dstat --net --time -N dc1.s1-eth2 --nocolor --output ./results/scaleout/' +
+    #             str(multiplier / 10**6) + '-from-client.csv &')
+    # cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth7 --nocolor --output ./results/scaleout/' +
+    #             str(multiplier / 10**6) + '-from-ids1.csv &')
+    # cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth9 --nocolor --output ./results/scaleout/' +
+    #             str(multiplier / 10**6) + '-from-vpn-ids.csv &')
+    # cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth10 --nocolor --output ./results/scaleout/' +
+    #             str(multiplier / 10**6) + '-from-vpn-fw.csv &')
+    # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "dstat --net --time -N tun0 --bits --output /tmp/dstat.csv" &')
+    cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
+    --loop=0 --mbps=%d -d 1 --intf1=intf1 /ftp.ready.pcap" &' % (test_time, (multiplier / 10**7))
+    cmds.append(cmd)
+    cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
+    --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**7))
+    cmds.append(cmd)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
         print('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
-    print("Generating traffic for 30 seconds")
+    print("Generating traffic for %d seconds" % test_time)
 
-    # start scaling up the bandwidth after 30 seconds
-    time.sleep(30)
+    # start scaling up the bandwidth after 50% of the time
+    time.sleep(test_time / 2)
     print("Scaling up bandwidth by factor of 1")
-    scale_bw(multiplier)
-    time.sleep(40)
+    # scale_bw(multiplier)
+    # each loop is around 40s for 10 Mbps speed, 2 loops easily make 1m
+    cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
+    --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**7))
+    cmds.append(cmd)
+
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+    cmds[:] = []
+    time.sleep(test_time / 2 + 10)
     # clean and save the results in csv file named after the test
     # cmds = clean_and_save(cmds, "scaleout")
-    # cmds.append('sudo killall dstat')
-    # cmds.append('sudo killall tcpreplay')
-    # for cmd in cmds:
-    #     execStatus = subprocess.call(cmd, shell=True)
-    #     print('returned %d from %s (0 is success)' % (execStatus, cmd))
+    cmds.append('sudo killall dstat')
+    cmds.append('sudo killall tcpreplay')
+    cmds.append('sudo docker cp mn.vpn:/tmp/dstat.csv ./results/scaleout/' +
+                str(multiplier / 10**6) + '-from-vpn.csv')
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
     print('done')
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     net = scaleOut()
     print("Done with scaleout!")
