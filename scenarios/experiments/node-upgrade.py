@@ -133,12 +133,12 @@ def nodeUpgrade():
     # create fw VNF with two interfaces. 'input' interface for 'client' and
     # 'output' interface for the 'ids' VNF. Both interfaces are bridged to
     # ovs1 bridge. knodir/sonata-fw-vnf has OVS and Ryu controller.
-    fw = cs1.startCompute("fw", image='knodir/sonata-fw-fixed2',
+    fw = cs1.startCompute("fw", image='knodir/sonata-fw-iptables2',
                           flavor_name=fl,
                           network=[{'id': 'input', 'ip': '10.0.1.5/24'},
                                    {'id': 'output-ids1', 'ip': '10.0.1.60/24'},
                                    {'id': 'output-ids2', 'ip': '10.0.1.61/24'},
-                                   {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
+                                   {'id': 'output-vpn', 'ip': '10.0.2.4/24'}])
     fw.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:4')
     fw.sendCmd('sudo ifconfig output-ids1 hw ether 00:00:00:00:00:05')
     fw.sendCmd('sudo ifconfig output-ids2 hw ether 00:00:00:00:01:05')
@@ -166,7 +166,7 @@ def nodeUpgrade():
                            flavor_name=fl,
                            network=[{'id': 'input-ids1', 'ip': '10.0.1.90/24'},
                                     {'id': 'input-ids2', 'ip': '10.0.1.91/24'},
-                                    {'id': 'input-fw', 'ip': '10.0.1.92/24'},
+                                    {'id': 'input-fw', 'ip': '10.0.2.5/24'},
                                     {'id': 'output', 'ip': '10.0.10.2/24'}])
     vpn.sendCmd('sudo ifconfig input-ids1 hw ether 00:00:00:00:00:9')
     vpn.sendCmd('sudo ifconfig input-fw hw ether 00:00:00:00:00:10')
@@ -189,8 +189,8 @@ def nodeUpgrade():
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from fw start.sh start (0 is success)' % execStatus)
 
-    os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 mn.client mn.nat mn.fw mn.ids1 mn.ids2 mn.vpn mn.server")
-    # os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.ids2 mn.vpn mn.server")
+    # os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 mn.client mn.nat mn.fw mn.ids1 mn.ids2 mn.vpn mn.server")
+    os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.ids2 mn.vpn mn.server")
     os.system("sudo docker update --cpu-shares 200000 mn.fw")
 
     print('> sleeping 2s to wait ryu controller initialize')
@@ -263,6 +263,9 @@ def nodeUpgrade():
     cmds.append('sudo docker exec -i mn.client /bin/bash -c "route add -net 10.8.0.0/24 dev intf1"')
     cmds.append('sudo docker exec -i mn.nat /bin/bash -c "route add -net 10.0.10.0/24 dev output"')
     cmds.append('sudo docker exec -i mn.nat /bin/bash -c "ip route add 10.8.0.0/24 dev output"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.10.0/24 dev output-ids1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.8.0.0/24 dev output-ids1"')
+
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids1"')
     # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids2"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "ip route del 10.0.10.10/32"')
@@ -352,12 +355,18 @@ def switch_ids():
 
     cmds = []
 
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=1,out_port=2"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=2,out_port=1"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=1,action=output:3"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=3,action=output:1"')
-    # # little hack to enforce immediate impact of the new OVS rule
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ip link set output-ids1 down && ip link set output-ids1 up"')
+    # cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=1,out_port=2"')
+    # cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=2,out_port=1"')
+    # cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=1,action=output:3"')
+    # cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=3,action=output:1"')
+    # # # little hack to enforce immediate impact of the new OVS rule
+    # cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ip link set output-ids1 down && ip link set output-ids1 up"')
+
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.10.0/24 dev output-ids2"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.8.0.0/24 dev output-ids2"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route del -net 10.0.10.0/24 dev output-ids1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route del -net 10.8.0.0/24 dev output-ids1"')
+
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route del -net 10.0.1.0/24 dev input-ids1"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.1.0/24 dev input-ids2"')
 
@@ -378,12 +387,16 @@ def switch_ids_back():
 
     cmds = []
 
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=1,out_port=3"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=3,out_port=1"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=1,action=output:2"')
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=2,action=output:1"')
-    # little hack to enforce immediate impact of the new OVS rule
-    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ip link set output-ids2 down && ip link set output-ids2 up"')
+    # cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=1,out_port=3"')
+    # cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl del-flows ovs-1 in_port=3,out_port=1"')
+    # cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=1,action=output:2"')
+    # cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ovs-ofctl add-flow ovs-1 priority=2,in_port=2,action=output:1"')
+    # # little hack to enforce immediate impact of the new OVS rule
+    # cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ip link set output-ids2 down && ip link set output-ids2 up"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.10.0/24 dev output-ids1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.8.0.0/24 dev output-ids1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route del -net 10.0.10.0/24 dev output-ids2"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route del -net 10.8.0.0/24 dev output-ids2"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route del -net 10.0.1.0/24 dev input-ids2"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.1.0/24 dev input-ids1"')
 

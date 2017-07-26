@@ -120,8 +120,6 @@ def scaleOut():
                                     # flavor_name=fl,
                                     network=[{'id': 'intf1', 'ip': '10.0.0.2/24'}])
     client.sendCmd('sudo ifconfig intf1 hw ether 00:00:00:00:00:1')
-    # os.system("sudo docker update --cpuset-cpus 0-63 --cpus 64 mn.client")
-    os.system("sudo docker update --cpuset-cpus 0-7 --cpus 8 mn.client")
 
     # create NAT VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
@@ -131,23 +129,19 @@ def scaleOut():
                                     {'id': 'output', 'ip': '10.0.1.4/24'}])
     nat.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:2')
     nat.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:3')
-    # os.system("sudo docker update --cpuset-cpus 0-63 --cpus 64 mn.nat")
-    os.system("sudo docker update --cpuset-cpus 0-7 --cpus 8 mn.nat")
 
     # create fw VNF with two interfaces. 'input' interface for 'client' and
     # 'output' interface for the 'ids' VNF. Both interfaces are bridged to
     # ovs1 bridge. knodir/sonata-fw-vnf has OVS and Ryu controller.
-    fw = cs1.startCompute("fw", image='knodir/sonata-fw-fixed',
+    fw = cs1.startCompute("fw", image='knodir/sonata-fw-iptables',
                           # flavor_name=fl,
                           network=[{'id': 'input', 'ip': '10.0.1.5/24'},
                                    {'id': 'output-ids', 'ip': '10.0.1.60/24'},
                                    # {'id': 'output-ids2', 'ip': '10.0.1.61/24'},
-                                   {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
+                                   {'id': 'output-vpn', 'ip': '10.0.2.4/24'}])
     fw.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:4')
     fw.sendCmd('sudo ifconfig output-ids hw ether 00:00:00:00:00:5')
     fw.sendCmd('sudo ifconfig output-vpn hw ether 00:00:00:00:00:6')
-    # os.system("sudo docker update --cpuset-cpus 0-63 --cpus 64 --cpu-shares 200000 mn.fw")
-    os.system("sudo docker update --cpuset-cpus 0-7 --cpus 8 --cpu-shares 200000 mn.fw")
 
     # create ids VNF with two interfaces. 'input' interface for 'fw' and
     # 'output' interface for the 'server' VNF.
@@ -161,8 +155,6 @@ def scaleOut():
     #                                  {'id': 'output', 'ip': '10.0.1.81/24'}])
     ids1.sendCmd('sudo ifconfig input hw ether 00:00:00:00:00:7')
     ids1.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:8')
-    # os.system("sudo docker update --cpuset-cpus 0-63 --cpus 64 mn.ids1")
-    os.system("sudo docker update --cpuset-cpus 0-7 --cpus 8 mn.ids1")
 
     # create VPN VNF with two interfaces. Its 'input'
     # interface faces the client and output interface the server VNF.
@@ -170,13 +162,11 @@ def scaleOut():
                            # flavor_name=fl,
                            network=[{'id': 'input-ids1', 'ip': '10.0.1.90/24'},
                                     # {'id': 'input-ids2', 'ip': '10.0.1.91/24'},
-                                    {'id': 'input-fw', 'ip': '10.0.1.92/24'},
+                                    {'id': 'input-fw', 'ip': '10.0.2.5/24'},
                                     {'id': 'output', 'ip': '10.0.10.2/24'}])
     vpn.sendCmd('sudo ifconfig input-ids1 hw ether 00:00:00:00:00:9')
     vpn.sendCmd('sudo ifconfig input-fw hw ether 00:00:00:00:00:10')
     vpn.sendCmd('sudo ifconfig output hw ether 00:00:00:00:00:11')
-    # os.system("sudo docker update --cpuset-cpus 0-63 --cpus 64 mn.vpn")
-    os.system("sudo docker update --cpuset-cpus 0-7 --cpus 8 mn.vpn")
 
     # create server VNF with one interface. Do not change assigned 10.0.10.10/24
     # address of the server. It is the address VPN clients use to connect to the
@@ -188,8 +178,6 @@ def scaleOut():
                                     # flavor_name=fl,
                                     network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
     server.sendCmd('sudo ifconfig intf2 hw ether 00:00:00:00:00:12')
-    # os.system("sudo docker update --cpuset-cpus 0-63 --cpus 64 mn.server")
-    os.system("sudo docker update --cpuset-cpus 0-7 --cpus 8 mn.server")
 
     # execute /start.sh script inside firewall Docker image. It starts Ryu
     # controller and OVS with proper configuration.
@@ -197,8 +185,8 @@ def scaleOut():
     execStatus = subprocess.call(cmd, shell=True)
     print('returned %d from fw start.sh start (0 is success)' % execStatus)
 
-    os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
-    # os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
+    # os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
+    os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
     os.system("sudo docker update --cpu-shares 200000 mn.fw")
 
     print('> sleeping 2s to wait ryu controller initialize')
@@ -268,8 +256,13 @@ def scaleOut():
     # manually chain routing table entries on VNFs
     cmds.append('sudo docker exec -i mn.client /bin/bash -c "route add -net 10.0.0.0/16 dev intf1"')
     cmds.append('sudo docker exec -i mn.client /bin/bash -c "route add -net 10.8.0.0/24 dev intf1"')
+
     cmds.append('sudo docker exec -i mn.nat /bin/bash -c "route add -net 10.0.10.0/24 dev output"')
     cmds.append('sudo docker exec -i mn.nat /bin/bash -c "ip route add 10.8.0.0/24 dev output"')
+
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.10.0/24 dev output-ids"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.8.0.0/24 dev output-ids"')
+
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids1"')
     # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids2"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "ip route del 10.0.10.10/32"')
@@ -494,7 +487,6 @@ def benchmark(multiplier):
     cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
     --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**7))
     cmds.append(cmd)
-
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
         print('returned %d from %s (0 is success)' % (execStatus, cmd))
@@ -520,8 +512,8 @@ def benchmark(multiplier):
     # cmds = clean_and_save(cmds, "scaleout")
     cmds.append('sudo killall dstat')
     cmds.append('sudo killall tcpreplay')
-    cmds.append('sudo docker cp mn.vpn:/tmp/dstat.csv ./results/scaleout/' +
-                str(multiplier / 10**6) + '-from-vpn.csv')
+    # cmds.append('sudo docker cp mn.vpn:/tmp/dstat.csv ./results/scaleout/' +
+    #             str(multiplier / 10**6) + '-from-vpn.csv')
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
         print('returned %d from %s (0 is success)' % (execStatus, cmd))
@@ -541,7 +533,7 @@ if __name__ == '__main__':
     benchmark(10**9)
     print('Running 10000 Mbps')
     benchmark(10**10)
-    # net.CLI()
+    net.CLI()
     net.stop()
     cleanup()
     os.system("sudo ../clean-stale.sh")

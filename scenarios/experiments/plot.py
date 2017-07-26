@@ -27,7 +27,6 @@ def extract_dstat(fname, pos, omit_sec, duration):
     # open the csv file with Python CSV parser, walk through each line (row) and
     # add to the bandwidth array only if the row value is numeric (digit), which
     # corresponds to the interface rx bandwidth reported on bps.
-    print(fname)
     with open(fname) as data_file:
         reader = csv.DictReader(data_file)
         for row in reader:
@@ -56,7 +55,7 @@ def extract_dstat(fname, pos, omit_sec, duration):
 
 def plot_upgrade(mbps):
     # amount of seconds to skip data collection, and duration of the experiment
-    omit_sec, duration = 0, 60
+    omit_sec, duration = 0, 300
     # for client we monitor TX traffic, which is the value on the 2nd position
     # of the CSV file.
     client_bw = extract_dstat('./results/upgrade/' +

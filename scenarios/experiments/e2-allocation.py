@@ -138,23 +138,6 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     return (net, api, dcs, tors)
 
 
-def topo_sort(chain):
-    """ Handcrafted topological sort for 4node chain. Note that this is a manual
-    sort which does not work for anything other than 4node chain (e.g., won't
-    work for existing 10node chain). This is okay since we have an actual Docker
-    based chain implementation only for 4node chain.
-    TODO(nodir): make this work for generic chains. """
-    if (len(chain) == 6) and ('source' in chain.keys()) and (
-            'nat' in chain.keys()) and ('fw' in chain.keys()) and (
-            'ids' in chain.keys()) and ('vpn' in chain.keys()) and (
-                    'sink' in chain.keys()):
-                glog.info('this seems to be correct 4node chain')
-                return ['source', 'nat', 'fw', 'ids', 'vpn', 'sink']
-    else:
-        glog.error('ERROR: topo_sort() works for 4node chain only')
-        sys.exit(1)
-
-
 def get_placement(pn_fname, vn_fname, algo):
     """ Does chain placement with NetSolver and returns the output. """
 
@@ -231,7 +214,7 @@ def get_placement(pn_fname, vn_fname, algo):
     # }
 
     # glog.info('allocations: %s' % allocations)
-    return allocations
+    return allocs
 
 
 def allocate_chains(dcs, allocs):
@@ -525,7 +508,7 @@ if __name__ == '__main__':
     api.start()
     net.start()
 
-    #allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
+    # allocs = get_placement(pn_fname, vn_fname, algos[0])  # netsolver
     # allocs = get_placement(pn_fname, vn_fname, algos[1])  # random
     allocs = get_placement(pn_fname, vn_fname, algos[2])  # packing
     num_of_chains = 0
@@ -534,7 +517,7 @@ if __name__ == '__main__':
             num_of_chains += 1
 
     glog.info('allocs: %s; num_of_chains = %d', allocs, num_of_chains)
-    #sys.exit(0)
+    # sys.exit(0)
     # allocate chains by placing them on appropriate servers
     vnfs = allocate_chains(dcs, allocs)
     # configure the datapath on chains to push packets through them
