@@ -275,10 +275,10 @@ def allocate_chains(dcs, allocs):
                 # node-upgrade experiment requires knodir/sonata-fw-vnf:upgrade
                 # image as it has an additional interface for ids2.
                 vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                        image='knodir/sonata-fw-ryu', flavor_name="fw",
+                                                        image='knodir/sonata-fw-iptables', flavor_name="fw",
                                                         network=[{'id': 'input', 'ip': '10.0.1.5/24'},
                                                                  {'id': 'output-ids', 'ip': '10.0.1.61/24'},
-                                                                 {'id': 'output-vpn', 'ip': '10.0.1.62/24'}])
+                                                                 {'id': 'output-vpn', 'ip': '10.0.2.4/24'}])
                 vnfs[vnf_name].append({vnf_id: vnf_obj})
                 os.system("sudo docker update --cpu-shares 200000 " + vnf_id)
 
@@ -297,7 +297,7 @@ def allocate_chains(dcs, allocs):
                 vnf_obj = dcs[server_name].startCompute(vnf_id,
                                                         image='knodir/vpn-client', flavor_name="vpn",
                                                         network=[{'id': 'input-ids', 'ip': '10.0.1.91/24'},
-                                                                 {'id': 'input-fw', 'ip': '10.0.1.92/24'},
+                                                                 {'id': 'input-fw', 'ip': '10.0.2.5/24'},
                                                                  {'id': 'output', 'ip': '10.0.10.2/24'}])
                 vnfs[vnf_name].append({vnf_id: vnf_obj})
 
@@ -338,11 +338,15 @@ def plumb_chains(net, vnfs, num_of_chains):
         vnf_name = vnf_name_and_obj.keys()[0]
         cmd = 'sudo docker exec mn.%s /root/start.sh %s &' % (vnf_name, vnf_index)
         execStatus = subprocess.call(cmd, shell=True)
+        cmd = 'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.10.0/24 dev output-ids"' % vnf_name
+        execStatus = subprocess.call(cmd, shell=True)
+        cmd = 'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.8.0.0/24 dev output-ids"' % vnf_name
+        execStatus = subprocess.call(cmd, shell=True)
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
         vnf_index = vnf_index + 1
 
-    glog.info('> sleeping 10s to let ryu controller initialize properly')
-    time.sleep(10)
+    glog.info('> sleeping 2s to let ryu controller initialize properly')
+    time.sleep(2)
     glog.info('< wait complete')
     glog.info('fw start done')
 
@@ -362,8 +366,8 @@ def plumb_chains(net, vnfs, num_of_chains):
         execStatus = subprocess.call(cmd, shell=True)
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
 
-    glog.info('> sleeping 5s to let fw, ids, nat initialize properly...')
-    time.sleep(5)
+    glog.info('> sleeping 2s to let fw, ids, nat initialize properly...')
+    time.sleep(2)
     glog.info('< 5s wait complete')
     glog.info('start VNF chaining')
 
@@ -430,9 +434,9 @@ def plumb_chains(net, vnfs, num_of_chains):
         glog.info('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
-    glog.info('> sleeping 15s to let VPN client initialize...')
-    time.sleep(15)
-    glog.info('< 15s wait complete')
+    glog.info('> sleeping 10s to let VPN client initialize...')
+    time.sleep(10)
+    glog.info('< 10s wait complete')
     glog.info('VPN client VNF started')
 
     for vnf_name_and_obj in vnfs['nat']:
@@ -468,7 +472,7 @@ def plumb_chains(net, vnfs, num_of_chains):
         src_vnf_obj = vnfs['source'][chain_index][src_vnf_name]
         dst_vnf_obj = vnfs['sink'][chain_index][dst_vnf_name]
 
-        ping_res = net.ping([src_vnf_obj, dst_vnf_obj], timeout=5)
+        ping_res = net.ping([src_vnf_obj, dst_vnf_obj], timeout=10)
 
         glog.info('ping %s -> %s. Packet drop %s%%',
                   src_vnf_name, dst_vnf_name, ping_res)

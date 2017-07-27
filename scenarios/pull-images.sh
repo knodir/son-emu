@@ -9,5 +9,10 @@ sudo docker pull knodir/snort-trusty
 sudo docker pull knodir/snort-xenial
 sudo docker pull knodir/vpn-client
 sudo docker pull knodir/vpn-server
+sudo docker pull knodir/sonata-fw-iptables
+sudo docker pull knodir/sonata-fw-iptables2
+sudo docker pull knodir/sonata-fw-fixed
+sudo docker pull knodir/sonata-fw-fixed2
+sudo docker pull knodir/sonata-fw-ryu
 
 echo "done"
