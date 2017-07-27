@@ -497,6 +497,7 @@ def benchmark(algo, line, mbps):
         cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "rm /tmp/dstat.csv"' % chain_index)
         cmds.append('sudo docker cp ../traces/output.pcap mn.chain%d-source:/' % chain_index)
 
+    cmds.append('sudo rm -rf ./results/allocation/')
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
         print('returned %d from %s (0 is success)' % (execStatus, cmd))
@@ -505,7 +506,7 @@ def benchmark(algo, line, mbps):
 
     for chain_index in range(num_of_chains):
         cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "dstat --net --time -N intf2 --bits --output /tmp/dstat.csv" &' % chain_index)
-        # cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "iperf3 -s" &' % chain_index)
+        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "iperf3 -s" &' % chain_index)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -518,8 +519,8 @@ def benchmark(algo, line, mbps):
 
     for chain_index in range(num_of_chains):
         # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
-        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (chain_index, mbps))
-        # cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "iperf3 -V -b %dM -c 10.0.10.10 -t 70" &' % (chain_index, mbps))
+        # cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (chain_index, mbps))
+        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "iperf3 -V  -b %dM -c 10.0.10.10 -t 70" &' % (chain_index, mbps))
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -624,7 +625,6 @@ if __name__ == '__main__':
             vnfs = allocate_chains(dcs, allocs)
             # configure the datapath on chains to push packets through them
             plumb_chains(net, vnfs, num_of_chains)
-            net.CLI()
             glog.info('successfully plumbed %d chains', num_of_chains)
             glog.info('Chain setup done. You should see the terminal now.')
             benchmark(algo=algo, line=num_of_chains, mbps=mbps)
