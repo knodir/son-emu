@@ -280,7 +280,7 @@ def allocate_chains(dcs, allocs):
                                                                  {'id': 'output-ids', 'ip': '10.0.1.61/24'},
                                                                  {'id': 'output-vpn', 'ip': '10.0.2.4/24'}])
                 vnfs[vnf_name].append({vnf_id: vnf_obj})
-                os.system("sudo docker update --cpu-shares 200000 " + vnf_id)
+                # os.system("sudo docker update --cpu-shares 200000 " + vnf_id)
 
             elif vnf_name == 'ids':
                 # create ids VNF with two interfaces. 'input' interface for 'fw' and
@@ -312,7 +312,7 @@ def allocate_chains(dcs, allocs):
                                                         image='knodir/vpn-server', flavor_name="sink",
                                                         network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
                 vnfs[vnf_name].append({vnf_id: vnf_obj})
-                os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 " + vnf_id)
+                # os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 " + vnf_id)
 
             else:
                 glog.error('ERROR: unknown VNF type: %s', vnf_name)

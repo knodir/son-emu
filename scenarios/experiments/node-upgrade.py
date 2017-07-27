@@ -190,8 +190,8 @@ def nodeUpgrade():
     print('returned %d from fw start.sh start (0 is success)' % execStatus)
 
     # os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 mn.client mn.nat mn.fw mn.ids1 mn.ids2 mn.vpn mn.server")
-    os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.ids2 mn.vpn mn.server")
-    os.system("sudo docker update --cpu-shares 200000 mn.fw")
+    # os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.ids2 mn.vpn mn.server")
+    # os.system("sudo docker update --cpu-shares 200000 mn.fw")
 
     print('> sleeping 2s to wait ryu controller initialize')
     time.sleep(2)
@@ -457,10 +457,10 @@ def benchmark(multiplier):
     cmds.append(cmd)
 
     cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
-    --loop=0 --mbps=%d -d 1 --intf1=intf1 /ftp.ready.pcap" &' % (test_time, (multiplier / 10**7))
+    --loop=0 --mbps=%d -d 1 --intf1=intf1 /ftp.ready.pcap" &' % (test_time, (multiplier / 10**6))
     cmds.append(cmd)
     cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
-    --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**7))
+    --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**6))
     cmds.append(cmd)
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)

@@ -186,8 +186,8 @@ def scaleOut():
     print('returned %d from fw start.sh start (0 is success)' % execStatus)
 
     # os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
-    os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
-    os.system("sudo docker update --cpu-shares 200000 mn.fw")
+    # os.system("sudo docker update --cpus 8 --cpuset-cpus 0-7 mn.client mn.nat mn.fw mn.ids1 mn.vpn mn.server")
+    # os.system("sudo docker update --cpu-shares 200000 mn.fw")
 
     print('> sleeping 2s to wait ryu controller initialize')
     time.sleep(2)
@@ -338,7 +338,7 @@ def set_bw(multiplier):
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
     # Input Sink
-    os.system('ovs-vsctl -- set Port dc3.s1-eth2 qos=@newqos -- \
+    os.system('ovs-vsctl -- set Port dc1.s1-eth3 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
 
@@ -398,7 +398,7 @@ def scale_bw(multiplier):
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
     # Input Sink
-    os.system('ovs-vsctl -- set Port dc3.s1-eth2 qos=@newqos -- \
+    os.system('ovs-vsctl -- set Port dc1.s1-eth3 qos=@newqos -- \
     --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
     --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
 
@@ -453,13 +453,13 @@ def benchmark(multiplier):
     cmds = clean_stale(cmds)
 
     # Set the initial bandwidth constraints of the system
-    # set_bw(multiplier)
+    set_bw(multiplier)
     time.sleep(3)
     # cmds.append('sudo docker exec -i mn.server /bin/bash -c "iperf3 -s --bind 10.8.0.1" &')
     # cmds.append('sudo docker exec -i mn.client /bin/bash -c "dstat --net --time -N intf1 --bits --output /tmp/dstat.csv" &')
     # cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "dstat --net --time -N input --bits --output /tmp/dstat.csv" &')
     # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "dstat --net --time -N input-fw --bits --output /tmp/dstat.csv" &')
-    cmd = 'sudo timeout %d dstat --net --time -N dc1.s1-eth2 --nocolor --output ./results/scaleout/%d-from-client.csv &' % (
+    cmd = 'sudo timeout %d dstat --net --time -N dc1.s1-eth1 --nocolor --output ./results/scaleout/%d-from-client.csv &' % (
         test_time, (multiplier / 10**6))
     cmds.append(cmd)
     cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth7 --nocolor --output ./results/scaleout/%d-from-ids.csv &' % (
@@ -482,10 +482,10 @@ def benchmark(multiplier):
     #             str(multiplier / 10**6) + '-from-vpn-fw.csv &')
     # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "dstat --net --time -N tun0 --bits --output /tmp/dstat.csv" &')
     cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
-    --loop=0 --mbps=%d -d 1 --intf1=intf1 /ftp.ready.pcap" &' % (test_time, (multiplier / 10**7))
+    --loop=0 --mbps=%d -d 1 --intf1=intf1 /ftp.ready.pcap" &' % (test_time, (multiplier / 10**6))
     cmds.append(cmd)
     cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
-    --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**7))
+    --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**6))
     cmds.append(cmd)
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -497,10 +497,10 @@ def benchmark(multiplier):
     # start scaling up the bandwidth after 50% of the time
     time.sleep(test_time / 2)
     print("Scaling up bandwidth by factor of 1")
-    # scale_bw(multiplier)
+    scale_bw(multiplier)
     # each loop is around 40s for 10 Mbps speed, 2 loops easily make 1m
     cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
-    --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**7))
+    --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**6))
     cmds.append(cmd)
 
     for cmd in cmds:

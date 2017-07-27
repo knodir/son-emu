@@ -100,7 +100,7 @@ def plot_upgrade(mbps):
     axes = plt.gca()
     plt.xlabel('Time (s)')
     plt.ylabel('Bandwidth (Mbps)')
-    plt.ylim([0, mbps * 0.35])
+    plt.ylim([0, mbps*5])
     client = plt.plot(t, client_bw, 'r--', label='Client')
     ids1 = plt.plot(t, ids1_bw, 'g--', label='IDS1')
     ids2 = plt.plot(t, ids2_bw, 'y--', label='IDS2')
@@ -122,7 +122,7 @@ def plot_scaleout(mbps):
     # for client we monitor TX traffic, which is the value on the 2nd position
     # of the CSV file.
     client_bw = extract_dstat('./results/scaleout/' +
-                              str(mbps) + '-from-client.csv', 1, omit_sec,
+                              str(mbps) + '-from-client.csv', 2, omit_sec,
                               duration)
     print('client_bw = %s, len = %d' % (client_bw, len(client_bw)))
 
@@ -151,7 +151,7 @@ def plot_scaleout(mbps):
     axes = plt.gca()
     plt.xlabel('Time (s)')
     plt.ylabel('Bandwidth (Mbps)')
-    plt.ylim([0, mbps * 0.35])
+    plt.ylim([0, mbps * 0.5])
     client = plt.plot(t, client_bw, 'r--', label='Client')
     ids = plt.plot(t, ids_bw, 'g--', label='IDS')
     vpn_fw = plt.plot(t, vpn_fw_bw, 'b--', label='VPN-FW')
