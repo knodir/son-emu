@@ -508,7 +508,7 @@ def benchmark(algo, line, mbps):
 
     for chain_index in range(num_of_chains):
         cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "dstat --net --time -N intf2 --bits --output /tmp/dstat.csv" &' % chain_index)
-        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "iperf3 -s" &' % chain_index)
+        # cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "iperf3 -s" &' % chain_index)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -521,8 +521,8 @@ def benchmark(algo, line, mbps):
 
     for chain_index in range(num_of_chains):
         # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
-        # cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (chain_index, mbps))
-        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "iperf3 --verbose --zerocopy  -b %dm -c 10.0.10.10 -t 86400" &' % (chain_index, mbps))
+        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (chain_index, mbps))
+        # cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "iperf3 --verbose --zerocopy  -b %dm -c 10.0.10.10 -t 86400" &' % (chain_index, mbps))
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)

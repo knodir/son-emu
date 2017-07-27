@@ -107,7 +107,7 @@ def plot_upgrade(mbps):
     # client = plt.plot(t, client_bw, 'r-', marker='o', markevery=max( int(duration / 2), 1), label='Source')
     ax.plot(t, client_bw, linestyle='--', color='k', label='Source')
     ax.plot(t, ids1_bw, linestyle='-.', color='g', label='IDS1')
-    ax.plot(t, ids2_bw, linestyle=':', color='y', label='IDS2')
+    ax.plot(t, ids2_bw, linestyle=':', color='m', label='IDS2')
     # ax.plot(t, vpn_fw_bw, linestyle='--', color='c',  label='VPN-FW')
     ax.plot(t, merged_server_bw, linestyle='-', color='r', label='Sink')
 
@@ -331,8 +331,8 @@ def plot_allocate(compute, mbps, duration):
     daisy_allocs = total_allocs[algos[2]]  # daisy']
 
     vdc_names = algos
-    bw_range = [0, 30]
-    allocs_range = np.arange(0, 3000, 200)
+    bw_range = [0, 100]
+    allocs_range = np.arange(0, mbps * 60, mbps * 10)
 
     plot3bars(plot_file_name,
               random_bw, packing_bw, daisy_bw,
