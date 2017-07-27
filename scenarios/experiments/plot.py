@@ -311,8 +311,8 @@ def plot_allocate100():
     daisy_allocs = total_allocs['daisy100']  # daisy']
 
     vdc_names = algos
-    bw_range = [0, 100]
-    allocs_range = np.arange(0, 1000, 100)
+    bw_range = [0, 30]
+    allocs_range = np.arange(0, 3000, 200)
 
     plot3bars(plot_file_name,
               random_bw, packing_bw, daisy_bw,
@@ -378,7 +378,7 @@ def plot_allocate10():
     daisy_allocs = total_allocs['daisy10']  # daisy']
 
     vdc_names = algos
-    bw_range = [0, 100]
+    bw_range = [0, 30]
     allocs_range = np.arange(0, 500, 100)
 
     plot3bars(plot_file_name,
