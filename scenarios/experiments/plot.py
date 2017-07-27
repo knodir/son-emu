@@ -379,7 +379,7 @@ def plot_allocate10():
 
     vdc_names = algos
     bw_range = [0, 100]
-    allocs_range = np.arange(0, 1000, 100)
+    allocs_range = np.arange(0, 500, 100)
 
     plot3bars(plot_file_name,
               random_bw, packing_bw, daisy_bw,

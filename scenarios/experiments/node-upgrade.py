@@ -7,6 +7,7 @@ from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
 from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM
 from emuvim.dcemulator.resourcemodel import ResourceModelRegistrar
 import os
+import sys
 
 import thread
 from mininet.node import RemoteController
@@ -106,6 +107,18 @@ def prepareDC():
     return (net, api, [off_cloud, chain_server1])
     # return (net, dc, api)
 
+def set_bw(multiplier):
+    low_bw = 1 * multiplier / 10
+    high_bw = 2 * multiplier / 10
+    print("Scaling up bandwidth by %d and %d" % (low_bw, high_bw))
+    sys.stdout.flush()
+    # Output DC1
+    os.system('ovs-vsctl -- set Port dc1.s1-eth2 qos=@newqos -- \
+    --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
+    # os.system('ovs-vsctl -- set Port dc2.s1-eth1 qos=@newqos -- \
+    # --id=@newqos create QoS type=linux-htb other-config:max-rate=' + str(high_bw) + ' queues=0=@q0 -- \
+    # --id=@q0   create   Queue   other-config:min-rate=' + str(high_bw) + ' other-config:max-rate=' + str(high_bw))
 
 def nodeUpgrade():
     """ Implements node-upgrade scenario. TBD. """
@@ -429,7 +442,9 @@ def benchmark(multiplier):
     cmds.append('sudo rm ./results/upgrade/' +
                 str(multiplier / 10**6) + '-from-server.csv')
     cmds = clean_stale(cmds)
-
+    
+    set_bw(multiplier)
+    
     # Set the initial bandwidth constraints of the system
     # set_bw(multiplier)
     time.sleep(3)
