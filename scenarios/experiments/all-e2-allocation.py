@@ -497,7 +497,8 @@ def benchmark(algo, line, mbps):
         cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "rm /tmp/dstat.csv"' % chain_index)
         cmds.append('sudo docker cp ../traces/output.pcap mn.chain%d-source:/' % chain_index)
 
-    cmds.append('sudo rm -rf ./results/allocation/')
+    cmds.append('sudo rm -f ./results/allocation/%s%s/*.csv' %
+        (algo, str(mbps)))
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
         print('returned %d from %s (0 is success)' % (execStatus, cmd))
