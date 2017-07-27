@@ -1,0 +1,13 @@
+"Dstat 0.7.3 CSV output"
+"Author:","Dag Wieers <dag@wieers.com>",,,,"URL:","http://dag.wieers.com/home-made/dstat/"
+"Host:","chain19-sink",,,,"User:","root"
+"Cmdline:","dstat --net --time -N intf2 --bits --output /tmp/dstat.csv",,,,"Date:","27 Jul 2017 17:22:33 UTC"
+"net/intf2",,"system"
+"recv","send","time"
+0,0,27-07 17:22:33
+1352960,39629,27-07 17:22:34
+1352894,37038,27-07 17:22:35
+1352300,33936,27-07 17:22:36
+1352960,40404,27-07 17:22:37
+1352960,38250,27-07 17:22:38
+1352960,34674,27-07 17:22:39

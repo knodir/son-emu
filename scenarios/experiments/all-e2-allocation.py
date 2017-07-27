@@ -14,6 +14,7 @@ from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM
 from mininet.node import RemoteController
 from mininet.clean import cleanup
 from mininet.node import DefaultController
+from optparse import OptionParser
 
 
 def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
@@ -498,7 +499,7 @@ def benchmark(algo, line, mbps):
         cmds.append('sudo docker cp ../traces/output.pcap mn.chain%d-source:/' % chain_index)
 
     cmds.append('sudo rm -f ./results/allocation/%s%s/*.csv' %
-        (algo, str(mbps)))
+                (algo, str(mbps)))
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
         print('returned %d from %s (0 is success)' % (execStatus, cmd))
@@ -521,7 +522,7 @@ def benchmark(algo, line, mbps):
     for chain_index in range(num_of_chains):
         # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
         # cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (chain_index, mbps))
-        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "iperf3 --verbose --zerocopy  -b %dm -c 10.0.10.10 -t 70" &' % (chain_index, mbps))
+        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "iperf3 --verbose --zerocopy  -b %dm -c 10.0.10.10 -t 86400" &' % (chain_index, mbps))
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -537,6 +538,8 @@ def benchmark(algo, line, mbps):
     for chain_index in range(num_of_chains):
         cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "pkill tcpreplay"' % chain_index)
         cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "pkill python2"' % chain_index)
+        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "killall iperf3"' % chain_index)
+        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "killall iperf3"' % chain_index)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -574,6 +577,13 @@ def benchmark(algo, line, mbps):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
+    parser = OptionParser()
+    parser.add_option("-t", "--topo", dest="topology",
+                      help="Specifiy the NSS topology")
+
+    (options, args) = parser.parse_args()
+    topology = options.topology
+
     # net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
 
     # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
@@ -586,15 +596,21 @@ if __name__ == '__main__':
     # pn_fname = "../topologies/e2-azure-1rack-48servers.pn.json"
     # net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
     # max_cu_net = 600 => 10 dc_cu x 60 physical cores
-
-    if sys.argv[1] == "nss":
+    if topology == "1":
         # e2-nss-1rack-8servers
         pn_fname = "../topologies/e2-nss-1rack-8servers.pn.json"
         vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
-    else:
-        # e2-azure-1rack-50servers
+        compute = 8
+    elif topology == "2":
+        # e2-azure-1rack-50servers with 10 compute
         vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
         pn_fname = "../topologies/e2-azure-1rack-50servers.pn.json"
+        compute = 10
+    else:
+        # e2-azure-1rack-50servers with 20 compute
+        vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
+        pn_fname = "../topologies/e2-azure-1rack-50-20servers.pn.json"
+        compute = 20
     algos = ['daisy', 'random', 'packing']
     bandwidths = [10, 100]
     # algos = ['daisy']
@@ -602,11 +618,15 @@ if __name__ == '__main__':
     for mbps in bandwidths:
         for algo in algos:
             # start API and containernet
-            if sys.argv[1] == "nss":
+            if topology == "1":
+                # e2-nss-1rack-8servers
                 net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
-            else:
+            elif topology == "2":
+                # e2-azure-1rack-50servers with 10 compute
                 net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
-                # net, api, dcs, tors = prepareDC(pn_fname, 20, 8704, 1200, 417792)
+            else:
+                # e2-azure-1rack-50servers with 20 compute
+                net, api, dcs, tors = prepareDC(pn_fname, 20, 8704, 1200, 417792)
             api.start()
             net.start()
 
@@ -628,6 +648,7 @@ if __name__ == '__main__':
             plumb_chains(net, vnfs, num_of_chains)
             glog.info('successfully plumbed %d chains', num_of_chains)
             glog.info('Chain setup done. You should see the terminal now.')
+            algo = algo + str(compute) + "_"
             benchmark(algo=algo, line=num_of_chains, mbps=mbps)
             net.stop()
             cleanup()

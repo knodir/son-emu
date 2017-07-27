@@ -453,9 +453,9 @@ def benchmark(multiplier):
     cmds.append('sudo rm ./results/upgrade/' +
                 str(multiplier / 10**6) + '-from-server.csv')
     cmds = clean_stale(cmds)
-    
-    set_bw(multiplier)
-    
+
+    # set_bw(multiplier)
+
     # Set the initial bandwidth constraints of the system
     # set_bw(multiplier)
     time.sleep(3)
@@ -483,10 +483,10 @@ def benchmark(multiplier):
     cmds.append(cmd)
 
     cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
-    --loop=0 --mbps=%d -d 1 --intf1=intf1 /ftp.ready.pcap" &' % (test_time, (multiplier / 10**6))
+    --loop=0 --mbps=%d -d 1 --intf1=intf1 /ftp.ready.pcap" &' % (test_time, (multiplier / 10**7))
     cmds.append(cmd)
     cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
-    --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**6))
+    --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**7))
     cmds.append(cmd)
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)

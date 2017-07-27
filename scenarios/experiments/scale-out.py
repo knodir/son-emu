@@ -12,6 +12,7 @@ from mininet.log import setLogLevel, info
 from mininet.node import RemoteController
 from mininet.node import DefaultController
 from mininet.clean import cleanup
+from optparse import OptionParser
 
 
 def prepareDC():
@@ -268,7 +269,6 @@ def scaleOut():
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.1.0/26 dev input"')
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.1.0/24 dev output-ids"')
 
-
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids1"')
     # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids2"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "ip route del 10.0.10.10/32"')
@@ -419,12 +419,10 @@ def clean_stale(cmds):
     cmds.append('sudo docker exec -i mn.client /bin/bash -c "pkill tcpreplay"')
     cmds.append('sudo docker exec -i mn.client /bin/bash -c "pkill python2"')
     cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "pkill python2"')
-    cmds.append('sudo docker exec -i mn.ids2 /bin/bash -c "pkill python2"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "pkill python2"')
     # remove stale dstat output file (if any)
     cmds.append('sudo docker exec -i mn.client /bin/bash -c "rm /tmp/dstat.csv"')
     cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "rm /tmp/dstat.csv"')
-    cmds.append('sudo docker exec -i mn.ids2 /bin/bash -c "rm /tmp/dstat.csv"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "rm /tmp/dstat.csv"')
 
     for cmd in cmds:
@@ -439,45 +437,55 @@ def clean_stale(cmds):
     return cmds
 
 
-def benchmark(multiplier):
+def benchmark(multiplier, test_time, iperf):
     """ Start traffic generation. """
     # list of commands to execute one-by-one
-    test_time = 300
     cmds = []
     # clean stale programs and remove old files
     print("Benchmarking %d Mbps...", multiplier / 10**6)
-    cmds.append('sudo rm ./results/scaleout/' +
-                str(multiplier / 10**6) + '-from-client.csv')
-    cmds.append('sudo rm ./results/scaleout/' +
-                str(multiplier / 10**6) + '-from-ids.csv')
-    cmds.append('sudo rm ./results/scaleout/' +
-                str(multiplier / 10**6) + '-from-vpn-fw.csv')
-    cmds.append('sudo rm ./results/scaleout/' +
-                str(multiplier / 10**6) + '-from-vpn-ids.csv')
-    cmds.append('sudo rm ./results/scaleout/' +
-                str(multiplier / 10**6) + '-from-server.csv')
+
+    if iperf:
+        testname = "scaleout-iperf"
+    else:
+        testname = "scaleout"
+    print(testname)
+    print(str(multiplier / 10**6))
+    cmd = 'sudo rm ./results/%s/%s-from-client.csv' % (testname, str(multiplier / 10**6))
+    cmds.append(cmd)
+    cmd = 'sudo rm ./results/%s/%s-from-ids.csv' % (testname, str(multiplier / 10**6))
+    cmds.append(cmd)
+    cmd = 'sudo rm ./results/%s/%s-from-vpn-fw.csv' % (testname, str(multiplier / 10**6))
+    cmds.append(cmd)
+    cmd = 'sudo rm ./results/%s/%s-from-vpn-ids.csv' % (testname, str(multiplier / 10**6))
+    cmds.append(cmd)
+    cmd = 'sudo rm ./results/%s/%s-from-server.csv' % (testname, str(multiplier / 10**6))
+    cmds.append(cmd)
     cmds = clean_stale(cmds)
 
     # Set the initial bandwidth constraints of the system
-    set_bw(multiplier)
+    # set_bw(multiplier)
     time.sleep(3)
-    # cmds.append('sudo docker exec -i mn.server /bin/bash -c "iperf3 -s --bind 10.8.0.1" &')
-    # cmds.append('sudo docker exec -i mn.client /bin/bash -c "dstat --net --time -N intf1 --bits --output /tmp/dstat.csv" &')
-    # cmds.append('sudo docker exec -i mn.ids1 /bin/bash -c "dstat --net --time -N input --bits --output /tmp/dstat.csv" &')
-    # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "dstat --net --time -N input-fw --bits --output /tmp/dstat.csv" &')
-    cmd = 'sudo timeout %d dstat --net --time -N dc1.s1-eth1 --nocolor --output ./results/scaleout/%d-from-client.csv &' % (
-        test_time, (multiplier / 10**6))
+    cmds.append('mkdir ./results/%s' % testname)
+    cmd = 'sudo timeout %s dstat --net --time -N dc1.s1-eth1 --nocolor --output ./results/%s/%s-from-client.csv &' % (
+        str(test_time), testname, str((multiplier / 10**6)))
     cmds.append(cmd)
-    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth7 --nocolor --output ./results/scaleout/%d-from-ids.csv &' % (
-        test_time, (multiplier / 10**6))
+    cmd = 'sudo timeout %s dstat --net --time -N dc2.s1-eth7 --nocolor --output ./results/%s/%s-from-ids.csv &' % (
+        str(test_time), testname, str((multiplier / 10**6)))
     cmds.append(cmd)
-    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth9 --nocolor --output ./results/scaleout/%d-from-vpn-ids.csv &' % (
-        test_time, (multiplier / 10**6))
+    cmd = 'sudo timeout %s dstat --net --time -N dc2.s1-eth9 --nocolor --output ./results/%s/%s-from-vpn-ids.csv &' % (
+        str(test_time), testname, str((multiplier / 10**6)))
     cmds.append(cmd)
-    cmd = 'sudo timeout %d dstat --net --time -N dc2.s1-eth10 --nocolor --output ./results/scaleout/%d-from-vpn-fw.csv &' % (
-        test_time, (multiplier / 10**6))
+    cmd = 'sudo timeout %s dstat --net --time -N dc2.s1-eth10 --nocolor --output ./results/%s/%s-from-vpn-fw.csv &' % (
+        str(test_time), testname, str((multiplier / 10**6)))
     cmds.append(cmd)
+    if iperf:
+        cmds.append('sudo docker exec -i mn.server /bin/bash -c "iperf3 -s > iperf-log.txt" &')
+        cmds.append('sudo docker exec -i mn.server /bin/bash -c "iperf3 -s > iperf-log.txt -p 5202" &')
 
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+    cmds[:] = []
     # cmds.append('sudo timeout 70 dstat --net --time -N dc1.s1-eth2 --nocolor --output ./results/scaleout/' +
     #             str(multiplier / 10**6) + '-from-client.csv &')
     # cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth7 --nocolor --output ./results/scaleout/' +
@@ -487,37 +495,40 @@ def benchmark(multiplier):
     # cmds.append('sudo timeout 70 dstat --net --time -N dc2.s1-eth10 --nocolor --output ./results/scaleout/' +
     #             str(multiplier / 10**6) + '-from-vpn-fw.csv &')
     # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "dstat --net --time -N tun0 --bits --output /tmp/dstat.csv" &')
+    time.sleep(3)
+    if iperf:
+        cmd = 'sudo docker exec -i mn.client /bin/bash -c "iperf3 --verbose --zerocopy \
+        -b %dm -c 10.0.10.10 -t %d > iperf-log.txt" &' % ((multiplier / 10**7), test_time)
+    else:
+        cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
+        --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**7))
+    execStatus = subprocess.call(cmd, shell=True)
+
     cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
-    --loop=0 --mbps=%d -d 1 --intf1=intf1 /ftp.ready.pcap" &' % (test_time, (multiplier / 10**6))
-    cmds.append(cmd)
-    cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
-    --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**6))
-    cmds.append(cmd)
-    for cmd in cmds:
-        execStatus = subprocess.call(cmd, shell=True)
-        print('returned %d from %s (0 is success)' % (execStatus, cmd))
-    cmds[:] = []
+    --loop=0 --mbps=%d -d 1 --intf1=intf1 /ftp.ready.pcap" &' % (test_time, (multiplier / 10**7))
+    execStatus = subprocess.call(cmd, shell=True)
 
     print("Generating traffic for %d seconds" % test_time)
 
     # start scaling up the bandwidth after 50% of the time
     time.sleep(test_time / 2)
     print("Scaling up bandwidth by factor of 1")
-    scale_bw(multiplier)
+    # scale_bw(multiplier)
     # each loop is around 40s for 10 Mbps speed, 2 loops easily make 1m
-    cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
-    --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**6))
-    cmds.append(cmd)
+    if iperf:
+        cmd = 'sudo docker exec -i mn.client /bin/bash -c "iperf3 --verbose --zerocopy \
+        -b %dm -c 10.0.10.10 -p 5202-t %d > iperf-log2.txt" &' % ((multiplier / 10**7), test_time)
+    else:
+        cmd = 'sudo timeout %d  docker exec -i mn.client /bin/bash -c "tcpreplay --quiet --enable-file-cache \
+        --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (test_time, (multiplier / 10**7))
+    execStatus = subprocess.call(cmd, shell=True)
 
-    for cmd in cmds:
-        execStatus = subprocess.call(cmd, shell=True)
-        print('returned %d from %s (0 is success)' % (execStatus, cmd))
-    cmds[:] = []
     time.sleep(test_time / 2 + 10)
     # clean and save the results in csv file named after the test
     # cmds = clean_and_save(cmds, "scaleout")
     cmds.append('sudo killall dstat')
     cmds.append('sudo killall tcpreplay')
+    cmds.append('sudo killall iperf3')
     # cmds.append('sudo docker cp mn.vpn:/tmp/dstat.csv ./results/scaleout/' +
     #             str(multiplier / 10**6) + '-from-vpn.csv')
     for cmd in cmds:
@@ -529,17 +540,23 @@ def benchmark(multiplier):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
+    parser = OptionParser()
+    parser.add_option("-i", "--iperf", action="store_true", dest="iperf", default=False, help="Use Iperf instead")
+
+    (options, args) = parser.parse_args()
+    print(options.iperf)
+    test_time = 300
     net = scaleOut()
     print("Done with scaleout!")
     print('Running 10 Mbps')
-    benchmark(10**7)
+    benchmark(10**7, test_time, options.iperf)
     print('Running 100 Mbps')
-    benchmark(10**8)
+    benchmark(10**8, test_time, options.iperf)
     print('Running 1000 Mbps')
-    benchmark(10**9)
+    benchmark(10**9, test_time, options.iperf)
     print('Running 10000 Mbps')
-    benchmark(10**10)
-    net.CLI()
+    benchmark(10**10, test_time, options.iperf)
+    # net.CLI()
     net.stop()
     cleanup()
     os.system("sudo ../clean-stale.sh")
