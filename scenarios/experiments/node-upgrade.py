@@ -276,8 +276,14 @@ def nodeUpgrade():
     cmds.append('sudo docker exec -i mn.client /bin/bash -c "route add -net 10.8.0.0/24 dev intf1"')
     cmds.append('sudo docker exec -i mn.nat /bin/bash -c "route add -net 10.0.10.0/24 dev output"')
     cmds.append('sudo docker exec -i mn.nat /bin/bash -c "ip route add 10.8.0.0/24 dev output"')
+
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.10.0/24 dev output-ids1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route del -net 10.0.1.0/24 dev output-ids1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.1.0/24 dev output-ids1"')
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.8.0.0/24 dev output-ids1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route del -net 10.0.1.0/24 dev input"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.0.0/24 dev input"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.1.0/26 dev input"')
 
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids1"')
     # cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids2"')
@@ -377,8 +383,10 @@ def switch_ids():
 
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.10.0/24 dev output-ids2"')
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.8.0.0/24 dev output-ids2"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.1.0/24 dev output-ids2"')
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route del -net 10.0.10.0/24 dev output-ids1"')
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route del -net 10.8.0.0/24 dev output-ids1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route del -net 10.0.1.0/24 dev output-ids1"')
 
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route del -net 10.0.1.0/24 dev input-ids1"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.1.0/24 dev input-ids2"')
@@ -408,8 +416,11 @@ def switch_ids_back():
     # cmds.append('sudo docker exec -i mn.fw /bin/bash -c "ip link set output-ids2 down && ip link set output-ids2 up"')
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.10.0/24 dev output-ids1"')
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.8.0.0/24 dev output-ids1"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route add -net 10.0.1.0/24 dev output-ids1"')
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route del -net 10.0.10.0/24 dev output-ids2"')
     cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route del -net 10.8.0.0/24 dev output-ids2"')
+    cmds.append('sudo docker exec -i mn.fw /bin/bash -c "route del -net 10.0.1.0/24 dev output-ids2"')
+
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route del -net 10.0.1.0/24 dev input-ids2"')
     cmds.append('sudo docker exec -i mn.vpn /bin/bash -c "route add -net 10.0.1.0/24 dev input-ids1"')
 
