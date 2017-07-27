@@ -330,20 +330,26 @@ def plumb_chains(net, vnfs, num_of_chains):
     # {fw: [{chain0_fw: obj}, {chain1_fw: obj}, ...],
     #  nat: [{chain0_nat: obj}, {chain1_nat: obj}, ...],
     #  ...}
+    cmds = []
 
     # execute /start.sh script inside all firewalls. It starts Ryu
     # controller and OVS with proper configuration.
     vnf_index = 0
     for vnf_name_and_obj in vnfs['fw']:
         vnf_name = vnf_name_and_obj.keys()[0]
-        cmd = 'sudo docker exec mn.%s /root/start.sh %s &' % (vnf_name, vnf_index)
-        execStatus = subprocess.call(cmd, shell=True)
-        cmd = 'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.10.0/24 dev output-ids"' % vnf_name
-        execStatus = subprocess.call(cmd, shell=True)
-        cmd = 'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.8.0.0/24 dev output-ids"' % vnf_name
-        execStatus = subprocess.call(cmd, shell=True)
-        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
+        cmds.append('sudo docker exec mn.%s /root/start.sh %s &' % (vnf_name, vnf_index))
+        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.10.0/24 dev output-ids"' % vnf_name)
+        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route del -net 10.0.1.0/24 dev output-ids"' % vnf_name)
+        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route del -net 10.0.1.0/24 dev input"' % vnf_name)
+        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.8.0.0/24 dev output-ids"' % vnf_name)
+        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 dev input"' % vnf_name)
+        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.1.0/26 dev input"' % vnf_name)
+        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.1.0/24 dev output-ids"' % vnf_name)
         vnf_index = vnf_index + 1
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        glog.info('returned %d from %s (0 is success)' % (execStatus, cmd))
+    cmds[:] = []
 
     glog.info('> sleeping 2s to let ryu controller initialize properly')
     time.sleep(2)
@@ -408,8 +414,6 @@ def plumb_chains(net, vnfs, num_of_chains):
         res = net.setChain(pair_src_name, pair_dst_name, 'output', 'intf2',
                            bidirectional=True, cmd='add-flow')
         glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
-
-    cmds = []
 
     for vnf_name_and_obj in vnfs['sink']:
         vnf_name = vnf_name_and_obj.keys()[0]
@@ -620,6 +624,7 @@ if __name__ == '__main__':
             vnfs = allocate_chains(dcs, allocs)
             # configure the datapath on chains to push packets through them
             plumb_chains(net, vnfs, num_of_chains)
+            net.CLI()
             glog.info('successfully plumbed %d chains', num_of_chains)
             glog.info('Chain setup done. You should see the terminal now.')
             benchmark(algo=algo, line=num_of_chains, mbps=mbps)
