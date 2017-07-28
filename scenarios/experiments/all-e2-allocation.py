@@ -612,7 +612,7 @@ if __name__ == '__main__':
         pn_fname = "../topologies/e2-azure-1rack-50-20servers.pn.json"
         compute = 20
     algos = ['daisy', 'random', 'packing']
-    bandwidths = [10, 100]
+    bandwidths = [10]
     # algos = ['daisy']
 
     for mbps in bandwidths:

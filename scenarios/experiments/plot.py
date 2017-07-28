@@ -344,87 +344,96 @@ def plot_allocate(compute, mbps, duration):
               ['random', 'packing', 'daisy'], bw_range, allocs_range)
     # vdc_names, bw_range, allocs_range)
 
+def plot_allocate_iperf(compute, mbps, duration):
+    # amount of seconds to skip data collection, and duration of the experiment
+    omit_sec, duration = 10, duration
+    extension = str(compute) + "_" + str(mbps) + "_iperf"
+    # list of average bandwidth amount each chain gets
+    chain_bw_aggr_list = []
+    total_bw = {}
+    total_allocs = {}
+    algos = ['random' + extension, 'packing' + extension, 'daisy' + extension]
+    # algo_bw_files = {'random': [], 'packing': [], 'daisy': []}
+    algo_bw_files = {algos[0]: [], algos[1]: [], algos[2]: []}
 
-# def plot_allocate10():
-#     # amount of seconds to skip data collection, and duration of the experiment
-#     omit_sec, duration = 10, 60
-#     # list of average bandwidth amount each chain gets
-#     chain_bw_aggr_list = []
-#     total_bw = {}
-#     total_allocs = {}
-#     # algo_bw_files = {'random': [], 'packing': [], 'daisy': []}
-#     algo_bw_files = {'random10': [], 'packing10': [], 'daisy10': []}
+    base_path = './results/allocation/iperf'
 
-#     base_path = './results/allocation'
+    # algos = ['random', 'packing', 'daisy']
+    # algos = ['random', 'packing']
+    # algos = ['random']
 
-#     # algos = ['random', 'packing', 'daisy']
-#     # algos = ['random', 'packing']
-#     # algos = ['random']
-#     algos = ['random10', 'packing10', 'daisy10']
+    for algo in algos:
+        folder_name = '%s/%s' % (base_path, algo)
+        fnames = os.listdir(folder_name)
+        for fname in fnames:
+            if fname.endswith('.csv'):
+                algo_bw_files[algo].append(fname)
+            else:
+                print('WARNING: non .csv file %s in %s' % (fname, folder_name))
+        total_allocs[algo] = len(algo_bw_files[algo])
 
-#     for algo in algos:
-#         folder_name = '%s/%s' % (base_path, algo)
-#         fnames = os.listdir(folder_name)
-#         for fname in fnames:
-#             if fname.endswith('.csv'):
-#                 algo_bw_files[algo].append(fname)
-#             else:
-#                 print('WARNING: non .csv file %s in %s' % (fname, folder_name))
-#         total_allocs[algo] = len(algo_bw_files[algo])
+    # print(algo_bw_files)
+    print('total_allocs = %s' % total_allocs)
 
-#     # print(algo_bw_files)
-#     print('total_allocs = %s' % total_allocs)
+    # for allocate we monitor Rx traffic, which is the value on the 1st position
+    # of the CSV file.
+    for algo in algos:
+        for fname in algo_bw_files[algo]:
+            infile = '%s/%s/%s' % (base_path, algo, fname)
+            bandwidth = extract_dstat(infile, 1, omit_sec, duration)
+            if len(bandwidth) == 0:
+                print('WARNING: len(bandwidth)=0 for %s' % infile)
+                continue
+            chain_bw_aggr_list.append(sum(bandwidth) / len(bandwidth))
+            # break
+        total_bw[algo] = sum(chain_bw_aggr_list)
+        chain_bw_aggr_list[:] = []
+        # break
+    print('total_bw = %s' % total_bw)
 
-#     # for allocate we monitor Rx traffic, which is the value on the 1st position
-#     # of the CSV file.
-#     for algo in algos:
-#         for fname in algo_bw_files[algo]:
-#             infile = '%s/%s/%s' % (base_path, algo, fname)
-#             bandwidth = extract_dstat(infile, 1, omit_sec, duration)
-#             if len(bandwidth) == 0:
-#                 print('WARNING: len(bandwidth)=0 for %s' % infile)
-#                 continue
-#             chain_bw_aggr_list.append(sum(bandwidth) / len(bandwidth))
-#             # break
-#         total_bw[algo] = sum(chain_bw_aggr_list)
-#         chain_bw_aggr_list[:] = []
-#         # break
-#     print('total_bw = %s' % total_bw)
+    plot_file_name = 'results/allocate' + extension + '_iperf.png'
+    plot_file_name_pdf = 'results/allocate' + extension + '_iperf.pdf'
 
-#     plot_file_name = 'results/allocate.png'
+    random_bw = total_bw[algos[0]]
+    packing_bw = total_bw[algos[1]]
+    daisy_bw = total_bw[algos[2]]  # daisy']
 
-#     random_bw = total_bw['random10']
-#     packing_bw = total_bw['packing10']
-#     daisy_bw = total_bw['daisy10']  # daisy']
+    random_allocs = total_allocs[algos[0]]
+    packing_allocs = total_allocs[algos[1]]
+    daisy_allocs = total_allocs[algos[2]]  # daisy']
 
-#     random_allocs = total_allocs['random10']
-#     packing_allocs = total_allocs['packing10']
-#     daisy_allocs = total_allocs['daisy10']  # daisy']
+    vdc_names = algos
+    bw_range = [0, 100]
+    allocs_range = np.arange(0, mbps * 60, mbps * 10)
 
-#     vdc_names = algos
-#     bw_range = [0, 30]
-#     allocs_range = np.arange(0, 500, 100)
-
-#     plot3bars(plot_file_name,
-#               random_bw, packing_bw, daisy_bw,
-#               random_allocs, packing_allocs, daisy_allocs,
-#               ['random', 'packing', 'daisy'], bw_range, allocs_range)
-#     # vdc_names, bw_range, allocs_range)
-
+    plot3bars(plot_file_name,
+              random_bw, packing_bw, daisy_bw,
+              random_allocs, packing_allocs, daisy_allocs,
+              ['random', 'packing', 'daisy'], bw_range, allocs_range)
+    plot3bars(plot_file_name_pdf,
+              random_bw, packing_bw, daisy_bw,
+              random_allocs, packing_allocs, daisy_allocs,
+              ['random', 'packing', 'daisy'], bw_range, allocs_range)
+    # vdc_names, bw_range, allocs_range
 
 if __name__ == '__main__':
     plot_upgrade(10)
     plot_upgrade(100)
     plot_upgrade(1000)
     plot_upgrade(10000)
-    plot_scaleout(10, True)
-    plot_scaleout(100, True)
-    plot_scaleout(1000, True)
-    plot_scaleout(10000, True)
+#    plot_scaleout(10, True)
+#    plot_scaleout(100, True)
+#    plot_scaleout(1000, True)
+#    plot_scaleout(10000, True)
     plot_scaleout(10, False)
     plot_scaleout(100, False)
     plot_scaleout(1000, False)
     plot_scaleout(10000, False)
     plot_allocate(compute=10, mbps=10, duration=60)
     plot_allocate(compute=10, mbps=100, duration=60)
-    plot_allocate(compute=20, mbps=10, duration=60)
+    plot_allocate_iperf(compute=10, mbps=10, duration=60)
+    plot_allocate_iperf(compute=10, mbps=100, duration=60)
+#    plot_allocate(compute=20, mbps=10, duration=60)
+#    plot_allocate(compute=20, mbps=100, duration=60)
+#    plot_allocate_iperf(compute=20, mbps=10, duration=60)
+#    plot_allocate_iperf(compute=20, mbps=100, duration=60)
