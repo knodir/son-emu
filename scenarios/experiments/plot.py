@@ -191,12 +191,12 @@ def plot3bars(plot_file_name,
 
     print('started plotting')
     n_groups = 1  # len(random_bw)
-    fig, ax = plt.subplots(figsize=(6, 3))
+    fig, ax = plt.subplots(figsize=(5, 2))
 
-    bar_width = 0.05
+    bar_width = 0.03
     index = np.arange(n_groups)
 
-    opacity = 0.3
+    opacity = 0.2
 
     random_rects = plt.bar(index, random_bw,
                            bar_width,
@@ -237,22 +237,21 @@ def plot3bars(plot_file_name,
     # put final metadata and plot
     axes = plt.gca()
     plt.ylabel('Aggregate chain throughput (Mbps)')
-
-    plt.yticks(allocs_range)
+    ax.set_ylim([0,550])
+    plt.yticks([0,100,200,300,400,500])
 
     plt.xlabel('Chain allocation algorithm')
     plt.xticks(index, [])  # vdc_names)
     # plt.xticks(index + 0.5*bar_width, vdc_names)
-
     # plot right-vertical axis for execution time
     ax2 = ax.twinx()
     ax2.set_ylim(bw_range)
-
-    ax2.plot(index + bar_width / 2, random_allocs, 'g^', markersize=10,
+    plt.yticks([0,10,20,30,40,50])
+    ax2.plot(index + bar_width / 2, random_allocs, 'g^', markersize=5,
              label='random')
-    ax2.plot(index + 5 * bar_width / 2, packing_allocs, 'bs', markersize=10,
+    ax2.plot(index + 5 * bar_width / 2, packing_allocs, 'bs', markersize=5,
              label='packing')
-    ax2.plot(index + 9 * bar_width / 2, daisy_allocs, 'r*', markersize=10,
+    ax2.plot(index + 9 * bar_width / 2, daisy_allocs, 'r*', markersize=5,
              label='daisy')
 
     ax2.set_ylabel('Number of allocated chains')
@@ -266,7 +265,7 @@ def plot3bars(plot_file_name,
 
     plt.draw()
     final_figure = plt.gcf()
-    final_figure.savefig(plot_file_name, bbox_inches='tight', dpi=200)
+    final_figure.savefig(plot_file_name, bbox_inches='tight', dpi=300)
 
     print('plotting done, see %s' % plot_file_name)
     plt.close(fig)
@@ -274,7 +273,7 @@ def plot3bars(plot_file_name,
 
 def plot_allocate(compute, mbps, duration):
     # amount of seconds to skip data collection, and duration of the experiment
-    omit_sec, duration = 10, duration
+    omit_sec, duration = 15, duration
     extension = str(compute) + "_" + str(mbps)
     # list of average bandwidth amount each chain gets
     chain_bw_aggr_list = []
@@ -331,22 +330,24 @@ def plot_allocate(compute, mbps, duration):
     daisy_allocs = total_allocs[algos[2]]  # daisy']
 
     vdc_names = algos
-    bw_range = [0, 100]
-    allocs_range = np.arange(0, mbps * 60, mbps * 10)
+    chain_range = [0, 55]
+    allocs_range = np.arange(0, mbps * 55, mbps * 10)
+    allocs_range = np.append(allocs_range, [550])
 
+    print (allocs_range)
     plot3bars(plot_file_name,
               random_bw, packing_bw, daisy_bw,
               random_allocs, packing_allocs, daisy_allocs,
-              ['random', 'packing', 'daisy'], bw_range, allocs_range)
+              ['random', 'packing', 'daisy'], chain_range, allocs_range)
     plot3bars(plot_file_name_pdf,
               random_bw, packing_bw, daisy_bw,
               random_allocs, packing_allocs, daisy_allocs,
-              ['random', 'packing', 'daisy'], bw_range, allocs_range)
+              ['random', 'packing', 'daisy'], chain_range, allocs_range)
     # vdc_names, bw_range, allocs_range)
 
 def plot_allocate_iperf(compute, mbps, duration):
     # amount of seconds to skip data collection, and duration of the experiment
-    omit_sec, duration = 10, duration
+    omit_sec, duration = 15, duration
     extension = str(compute) + "_" + str(mbps) + "_iperf"
     # list of average bandwidth amount each chain gets
     chain_bw_aggr_list = []
@@ -434,6 +435,6 @@ if __name__ == '__main__':
     plot_allocate_iperf(compute=10, mbps=10, duration=60)
     plot_allocate_iperf(compute=10, mbps=100, duration=60)
     plot_allocate(compute=20, mbps=10, duration=60)
-#    plot_allocate(compute=20, mbps=100, duration=60)
+    plot_allocate(compute=20, mbps=100, duration=60)
     plot_allocate_iperf(compute=20, mbps=10, duration=60)
 #    plot_allocate_iperf(compute=20, mbps=100, duration=60)

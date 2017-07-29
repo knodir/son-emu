@@ -496,7 +496,7 @@ def benchmark(algo, line, mbps):
         cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "pkill python2"' % chain_index)
         # remove stale dstat output file (if any)
         cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "rm /tmp/dstat.csv"' % chain_index)
-        cmds.append('sudo docker cp ../traces/output.pcap mn.chain%d-source:/' % chain_index)
+        cmds.append('sudo docker cp ../traces/output2.pcap mn.chain%d-source:/' % chain_index)
 
     cmds.append('sudo rm -f ./results/allocation/%s%s/*.csv' %
                 (algo, str(mbps)))
@@ -521,7 +521,7 @@ def benchmark(algo, line, mbps):
 
     for chain_index in range(num_of_chains):
         # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
-        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 /output.pcap" &' % (chain_index, mbps))
+        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 output2.pcap" &' % (chain_index, mbps))
         # cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "iperf3 --verbose --zerocopy  -b %dm -c 10.0.10.10 -t 86400" &' % (chain_index, mbps))
 
     for cmd in cmds:
@@ -531,7 +531,7 @@ def benchmark(algo, line, mbps):
     cmds[:] = []
 
     print('>>> wait 60s to complete the experiment')
-    time.sleep(60)
+    time.sleep(180)
     print('<<< wait complete.')
 
     # kill existing tcpreplay and dstat
