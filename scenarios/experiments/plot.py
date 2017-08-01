@@ -98,20 +98,29 @@ def plot_upgrade(mbps):
     merged_server_bw = [x + y for x, y in zip(vpn_ids2_bw, merged_server_bw)]
 
     # Plots the figure
-    fig, ax = plt.subplots(figsize=(8, 2))
+    fig, ax = plt.subplots(figsize=(3, 1))
     axes = plt.gca()
 
     plt.xlabel('Time (s)')
-    plt.ylabel('Bandwidth (Mbps)')
-    plt.ylim([0, mbps * 0.25])
-    # client = plt.plot(t, client_bw, 'r-', marker='o', markevery=max( int(duration / 2), 1), label='Source')
-    ax.plot(t, client_bw, linestyle='--', color='k', label='Source')
-    ax.plot(t, ids1_bw, linestyle='-.', color='g', label='IDS1')
-    ax.plot(t, ids2_bw, linestyle=':', color='m', label='IDS2')
-    # ax.plot(t, vpn_fw_bw, linestyle='--', color='c',  label='VPN-FW')
-    ax.plot(t, merged_server_bw, linestyle='-', color='r', label='Sink')
+    plt.ylabel('Throughput (Mbps)')
+    plt.ylim([0, 32])
+    plt.yticks(np.arange(0, 32, 10))
 
-    plt.legend(loc='upper left', bbox_to_anchor=(0, 1.25), numpoints=1, ncol=4,
+    plt.xlim([0, 300])
+    plt.xticks(np.arange(0, 301, 150))
+    
+    # client = plt.plot(t, client_bw, 'r-', marker='o', markevery=max( int(duration / 2), 1), label='Source')
+    ax.plot(t, client_bw, linestyle='--', color='k', label='Source',
+            marker='>', markersize=5, markevery=[40, 75])
+    ax.plot(t, ids1_bw, linestyle='-.', color='g', label='IDS1',
+            marker='x', markersize=5, markevery=[20, 75])
+    ax.plot(t, ids2_bw, linestyle=':', color='m', label='IDS2',
+            marker='d', markersize=5, markevery=[20, 75])
+    # ax.plot(t, vpn_fw_bw, linestyle='--', color='c',  label='VPN-FW')
+    ax.plot(t, merged_server_bw, linestyle='-', color='r', label='Sink',
+            marker='<', markersize=5, markevery=[60, 75])
+
+    plt.legend(loc='upper left', bbox_to_anchor=(0, 2.25), numpoints=1, ncol=4,
                frameon=False)
     plt.draw()
     final_figure = plt.gcf()
@@ -161,19 +170,43 @@ def plot_scaleout(mbps, iperf):
     t = np.arange(0.0, duration, 1)
     merged_server_bw = [x + y for x, y in zip(vpn_ids_bw, vpn_fw_bw)]
     # Plots the figure
-    fig, ax = plt.subplots(figsize=(8, 2))
+    fig, ax = plt.subplots(figsize=(3, 1))
     axes = plt.gca()
     plt.xlabel('Time (s)')
-    plt.ylabel('Bandwidth (Mbps)')
-    plt.ylim([0, mbps * 0.35])
+    plt.ylabel('Throughput (Mbps)')
+    plt.ylim([0, 32])
+    plt.yticks(np.arange(0, 32, 10))
+
+    plt.xlim([0, 300])
+    plt.xticks(np.arange(0, 301, 150))
     # client = plt.plot(t, client_bw, 'r-', marker='o', markevery=max( int(duration / 2), 1), label='Source')
-    ax.plot(t, client_bw, linestyle='--', color='k', label='Source')
-    ax.plot(t, ids_bw, linestyle='-.', color='g', label='IDS')
-    ax.plot(t, vpn_fw_bw, linestyle=':', color='m', label='VPN-FW')
-    ax.plot(t, merged_server_bw, linestyle='-', color='r', label='Sink')
+    ax.plot(t, client_bw, linestyle='--', color='k', label='Source',
+            marker='>', markersize=5, markevery=[40, 75])
+    ax.plot(t, ids_bw, linestyle='-.', color='g', label='IDS',
+            marker='o', markersize=5, markevery=[20, 75])
+    ax.plot(t, vpn_fw_bw, linestyle=':', color='m', label='VPN-FW',
+            marker='*', markersize=5, markevery=[60, 75])
+    ax.plot(t, merged_server_bw, linestyle='-', color='r', label='Sink',
+            marker='<', markersize=5, markevery=[60, 75])
     # server = plt.plot(t, server_bw, 'b--', label='Server')
 
-    ax.legend(loc='upper left', bbox_to_anchor=(0, 1.25), numpoints=1, ncol=4,
+
+    # ax.plot(t, client_bw, linestyle='--', color='k', label='Source',
+    #         marker='>', markersize=5, markevery=[40, 75])
+    # ax.plot(t, ids1_bw, linestyle='-.', color='g', label='IDS1',
+    #         marker='x', markersize=5, markevery=[20, 75])
+    # ax.plot(t, ids2_bw, linestyle=':', color='m', label='IDS2',
+    #         marker='d', markersize=5, markevery=[20, 75])
+    # # ax.plot(t, vpn_fw_bw, linestyle='--', color='c',  label='VPN-FW')
+    # ax.plot(t, merged_server_bw, linestyle='-', color='r', label='Sink',
+    #         marker='<', markersize=5, markevery=[60, 75])
+
+
+
+
+
+
+    ax.legend(loc='upper left', bbox_to_anchor=(0, 2.25), numpoints=1, ncol=4,
               frameon=False)
     plt.draw()
     final_figure = plt.gcf()
@@ -191,7 +224,7 @@ def plot3bars(plot_file_name,
 
     print('started plotting')
     n_groups = 1  # len(random_bw)
-    fig, ax = plt.subplots(figsize=(5, 2))
+    fig, ax = plt.subplots(figsize=(5, 0.8))
 
     bar_width = 0.03
     index = np.arange(n_groups)
@@ -237,31 +270,33 @@ def plot3bars(plot_file_name,
     # put final metadata and plot
     axes = plt.gca()
     plt.ylabel('Aggregate chain throughput (Mbps)')
-    ax.set_ylim([0,550])
-    plt.yticks([0,100,200,300,400,500])
+    #ax.set_ylim([0,550])
+    #plt.yticks([0,100,200,300,400,500])
+    plt.yticks(np.arange(0, 401, 200))
 
     plt.xlabel('Chain allocation algorithm')
     plt.xticks(index, [])  # vdc_names)
     # plt.xticks(index + 0.5*bar_width, vdc_names)
     # plot right-vertical axis for execution time
-    ax2 = ax.twinx()
-    ax2.set_ylim(bw_range)
-    plt.yticks([0,10,20,30,40,50])
-    ax2.plot(index + bar_width / 2, random_allocs, 'g^', markersize=5,
-             label='random')
-    ax2.plot(index + 5 * bar_width / 2, packing_allocs, 'bs', markersize=5,
-             label='packing')
-    ax2.plot(index + 9 * bar_width / 2, daisy_allocs, 'r*', markersize=5,
-             label='daisy')
+    #ax2 = ax.twinx()
+    #ax2.set_ylim(bw_range)
+    #plt.yticks([0,10,20,30,40,50])
+    #ax2.plot(index + bar_width / 2, random_allocs, 'g^', markersize=5,
+    #         label='random')
+    #ax2.plot(index + 5 * bar_width / 2, packing_allocs, 'bs', markersize=5,
+    #         label='packing')
+    #ax2.plot(index + 9 * bar_width / 2, daisy_allocs, 'r*', markersize=5,
+    #         label='daisy')
 
-    ax2.set_ylabel('Number of allocated chains')
+    #ax2.set_ylabel('Number of allocated chains')
 
     # put legends
-    ax.legend(loc='upper left', bbox_to_anchor=(-0.05, 1.6), numpoints=1, ncol=1,
-              title='Left Scale, Throughput', frameon=False)
-    ax2.legend(loc='upper right', bbox_to_anchor=(1.1, 1.6),
-               numpoints=1, ncol=1, frameon=False,
-               title='Right Scale, Number Of Chains')
+    vert_anchor = 3.3
+    ax.legend(loc='upper left', bbox_to_anchor=(-0.05, vert_anchor),
+            numpoints=1, ncol=1, title='Left Scale, Throughput', frameon=False)
+    #ax2.legend(loc='upper right', bbox_to_anchor=(1.1, vert_anchor),
+    #           numpoints=1, ncol=1, frameon=False,
+    #           title='Right Scale, Number Of Chains')
 
     plt.draw()
     final_figure = plt.gcf()
@@ -418,23 +453,41 @@ def plot_allocate_iperf(compute, mbps, duration):
     # vdc_names, bw_range, allocs_range
 
 if __name__ == '__main__':
-    plot_upgrade(10)
-    plot_upgrade(100)
-    plot_upgrade(1000)
-    plot_upgrade(10000)
-#    plot_scaleout(10, True)
-#    plot_scaleout(100, True)
-#    plot_scaleout(1000, True)
-#    plot_scaleout(10000, True)
-    plot_scaleout(10, False)
-    plot_scaleout(100, False)
-    plot_scaleout(1000, False)
-    plot_scaleout(10000, False)
-    plot_allocate(compute=10, mbps=10, duration=60)
-    plot_allocate(compute=10, mbps=100, duration=60)
-    plot_allocate_iperf(compute=10, mbps=10, duration=60)
-    plot_allocate_iperf(compute=10, mbps=100, duration=60)
+    # plot_upgrade(10)
+
+    ####### this one is used in the paper
+    # plot_upgrade(100)
+    
+
+    # plot_upgrade(1000)
+    # plot_upgrade(10000)
+
+    # plot_scaleout(10, True)
+    # plot_scaleout(100, True)
+    # plot_scaleout(1000, True)
+    # plot_scaleout(10000, True)
+
+    # plot_scaleout(10, False)
+
+
+    ####### this one is used in the paper
+    # plot_scaleout(100, False)
+
+
+    # plot_scaleout(1000, False)
+    # plot_scaleout(10000, False)
+
+    # plot_allocate(compute=10, mbps=10, duration=60)
+    # plot_allocate(compute=10, mbps=100, duration=60)
+    # plot_allocate_iperf(compute=10, mbps=10, duration=60)
+    # plot_allocate_iperf(compute=10, mbps=100, duration=60)
+
+
+    ####### this one is used in the paper
     plot_allocate(compute=20, mbps=10, duration=60)
-    plot_allocate(compute=20, mbps=100, duration=60)
-    plot_allocate_iperf(compute=20, mbps=10, duration=60)
-#    plot_allocate_iperf(compute=20, mbps=100, duration=60)
+
+
+    # plot_allocate(compute=20, mbps=100, duration=60)
+    # plot_allocate_iperf(compute=20, mbps=10, duration=60)
+    # plot_allocate_iperf(compute=20, mbps=100, duration=60)
+
