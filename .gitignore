@@ -1,9 +1,3 @@
-scenarios/upgrade/output
-*.DS_Store
-
-# emulation project built files
-vnfs/*.son
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -81,11 +75,3 @@ target/
 
 # JUnit xml
 utils/ci/junit-xml/*.xml
-
-*.pcap
-
-*.sublime-workspace
-
-*.sublime-project
-
-*.dmp

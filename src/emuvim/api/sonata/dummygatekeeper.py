@@ -14,7 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-Neither the name of the SONATA-NFV [, ANY ADDITIONAL AFFILIATION]
+Neither the name of the SONATA-NFV, Paderborn University
 nor the names of its contributors may be used to endorse or promote
 products derived from this software without specific prior written
 permission.
@@ -83,6 +83,10 @@ AUTO_DEPLOY = False
 
 # and also automatically terminate any other running services
 AUTO_DELETE = False
+
+# default placement algorithm to use for this dummygatekeeper instance
+# we need to use the name of the class as a string
+PLACEMENT_ALGORITHM = 'RoundRobinDcPlacementWithSAPs'
 
 def generate_subnets(prefix, base, subnet_size=50, mask=24):
     # Generate a list of ipaddress in subnets
@@ -197,7 +201,8 @@ class Service(object):
         # 2. compute placement of this service instance (adds DC names to VNFDs)
         if not GK_STANDALONE_MODE:
             #self._calculate_placement(FirstDcPlacement)
-            self._calculate_placement(RoundRobinDcPlacementWithSAPs)
+            #self._calculate_placement(RoundRobinDcPlacementWithSAPs)
+            self._calculate_placement(eval(PLACEMENT_ALGORITHM))
         # 3. start all vnfds that we have in the service (except SAPs)
         for vnf_id in self.vnfds:
             vnfd = self.vnfds[vnf_id]
@@ -211,7 +216,9 @@ class Service(object):
             self._start_sap(self.saps[sap], instance_uuid)
 
         # 5. Deploy E-Line and E_LAN links
-        if "virtual_links" in self.nsd:
+        # Attention: Only done if ""forwarding_graphs" section in NSD exists,
+        # even if "forwarding_graphs" are not used directly.
+        if "virtual_links" in self.nsd and "forwarding_graphs" in self.nsd:
             vlinks = self.nsd["virtual_links"]
             # constituent virtual links are not checked
             #fwd_links = self.nsd["forwarding_graphs"][0]["constituent_virtual_links"]
@@ -564,6 +571,7 @@ class Service(object):
 
     def _start_sap(self, sap, instance_uuid):
         if not DEPLOY_SAP:
+            LOG.debug("Not deploying SAPs")
             return
 
         LOG.info('start SAP: {0} ,type: {1}'.format(sap['name'],sap['type']))
@@ -921,12 +929,21 @@ class RoundRobinDcPlacementWithSAPs(object):
                     dc = dcs_list[randint(0, dc_len-1)]
                     saps[intf_sap_id]['dc'] = dc
 
+class CustomPlacementvCDN(object):
+    """
+    Custom placement (hard-coded) for the vCDN example on a 3 pop topology.
+    """
+    def place(self, nsd, vnfds, saps, dcs):
+        vnfds['squid1']["dc"] = dcs['dc1']
+        vnfds['webserver1']["dc"] = dcs['dc3']
+        saps['vCDN-SAP1']["dc"] = dcs['dc1']
+        saps['vCDN-SAP2']["dc"] = dcs['dc2']
+
 
 
 """
 Resource definitions and API endpoints
 """
-
 
 class Packages(fr.Resource):
 

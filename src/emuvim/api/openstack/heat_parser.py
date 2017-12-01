@@ -1,3 +1,30 @@
+"""
+Copyright (c) 2017 SONATA-NFV and Paderborn University
+ALL RIGHTS RESERVED.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Neither the name of the SONATA-NFV, Paderborn University
+nor the names of its contributors may be used to endorse or promote
+products derived from this software without specific prior written
+permission.
+
+This work has been performed in the framework of the SONATA project,
+funded by the European Commission under Grant number 671517 through
+the Horizon 2020 and 5G-PPP programmes. The authors would like to
+acknowledge the contributions of their colleagues of the SONATA
+partner consortium (www.sonata-nfv.eu).
+"""
 from __future__ import print_function  # TODO remove when print is no longer needed for debugging
 from resources import *
 from datetime import datetime
@@ -6,6 +33,9 @@ import sys
 import uuid
 import logging
 import ip_handler as IP
+
+
+LOG = logging.getLogger("api.openstack.heat.parser")
 
 
 class HeatParser:
@@ -64,7 +94,10 @@ class HeatParser:
 
         if len(self.bufferResource) > 0:
             print(str(len(self.bufferResource)) +
-                  ' classes could not be created, because the dependencies could not be found.')
+                  ' classes of the HOT could not be created, because the dependencies could not be found.')
+            print("the problem classes are:")
+            for br in self.bufferResource:
+                print("class: %s" % str(br))
             return False
         return True
 
@@ -93,7 +126,7 @@ class HeatParser:
                     stack.nets[net_name] = self.compute.create_network(net_name, True)
 
             except Exception as e:
-                logging.warning('Could not create Net: ' + e.message)
+                LOG.warning('Could not create Net: ' + e.message)
             return
 
         if 'OS::Neutron::Subnet' in resource['type'] and "Net" not in resource['type']:
@@ -113,7 +146,7 @@ class HeatParser:
                 if not stack_update:
                     net.set_cidr(IP.get_new_cidr(net.subnet_id))
             except Exception as e:
-                logging.warning('Could not create Subnet: ' + e.message)
+                LOG.warning('Could not create Subnet: ' + e.message)
             return
 
         if 'OS::Neutron::Port' in resource['type']:
@@ -125,14 +158,14 @@ class HeatParser:
                 else:
                     port = stack.ports[port_name]
 
-                if resource['properties']['network']['get_resource'] in stack.nets:
+                if str(resource['properties']['network']['get_resource']) in stack.nets:
                     net = stack.nets[resource['properties']['network']['get_resource']]
                     if net.subnet_id is not None:
                         port.net_name = net.name
                         port.ip_address = net.get_new_ip_address(port.name)
                         return
             except Exception as e:
-                logging.warning('Could not create Port: ' + e.message)
+                LOG.warning('Could not create Port: ' + e.message)
             self.bufferResource.append(resource)
             return
 
@@ -165,7 +198,7 @@ class HeatParser:
                     server.port_names.append(port_name)
                 return
             except Exception as e:
-                logging.warning('Could not create Server: ' + e.message)
+                LOG.warning('Could not create Server: ' + e.message)
             return
 
         if 'OS::Neutron::RouterInterface' in resource['type']:
@@ -186,7 +219,7 @@ class HeatParser:
                         stack.routers[router_name].add_subnet(subnet_name)
                         return
             except Exception as e:
-                logging.warning('Could not create RouterInterface: ' + e.__repr__())
+                LOG.warning('Could not create RouterInterface: ' + e.__repr__())
             self.bufferResource.append(resource)
             return
 
@@ -199,7 +232,7 @@ class HeatParser:
 
                 stack.ports[port_name].floating_ip = floating_network_id
             except Exception as e:
-                logging.warning('Could not create FloatingIP: ' + e.message)
+                LOG.warning('Could not create FloatingIP: ' + e.message)
             return
 
         if 'OS::Neutron::Router' in resource['type']:
@@ -211,7 +244,17 @@ class HeatParser:
                 print('Could not create Router: ' + e.message)
             return
 
-        logging.warning('Could not determine resource type!')
+        if 'OS::Heat::ResourceGroup' in resource['type']:
+            try:
+                embedded_resource = resource['properties']['resource_def']
+                LOG.debug("Found resource in resource group: {}".format(embedded_resource))
+                # recursively parse embedded resource
+                self.handle_resource(embedded_resource, stack, dc_label, stack_update)
+            except Exception as e:
+                print('Could not create Router: ' + e.message)
+            return
+
+        LOG.warning('Could not determine resource type: {}'.format(resource['type']))
         return
 
     def shorten_server_name(self, server_name, stack):

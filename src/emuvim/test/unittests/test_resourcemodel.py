@@ -47,7 +47,7 @@ class testResourceModel(SimpleTestTopology):
         """
         r = BaseResourceModel()
         # check if default flavors are there
-        self.assertTrue(len(r._flavors) >= 5)
+        self.assertTrue(len(r._flavors) == 5)
         # check addFlavor functionality
         f = ResourceFlavor("test", {"testmetric": 42})
         r.addFlavour(f)

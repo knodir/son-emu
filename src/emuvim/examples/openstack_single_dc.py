@@ -1,5 +1,5 @@
 """
-Copyright (c) 2015 SONATA-NFV and Paderborn University
+Copyright (c) 2017 SONATA-NFV and Paderborn University
 ALL RIGHTS RESERVED.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,56 +25,49 @@ the Horizon 2020 and 5G-PPP programmes. The authors would like to
 acknowledge the contributions of their colleagues of the SONATA
 partner consortium (www.sonata-nfv.eu).
 """
-"""
-A simple topology with two PoPs for the y1 demo story board.
-
-        (dc1) <<-->> s1 <<-->> (dc2)
-"""
-
 import logging
 from mininet.log import setLogLevel
 from emuvim.dcemulator.net import DCNetwork
 from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
-from emuvim.api.sonata import SonataDummyGatekeeperEndpoint
-from mininet.node import RemoteController
+from emuvim.api.openstack.openstack_api_endpoint import OpenstackApiEndpoint
 
 logging.basicConfig(level=logging.INFO)
+setLogLevel('info')  # set Mininet loglevel
+logging.getLogger('werkzeug').setLevel(logging.DEBUG)
+logging.getLogger('api.openstack.base').setLevel(logging.DEBUG)
+logging.getLogger('api.openstack.compute').setLevel(logging.DEBUG)
+logging.getLogger('api.openstack.keystone').setLevel(logging.DEBUG)
+logging.getLogger('api.openstack.nova').setLevel(logging.DEBUG)
+logging.getLogger('api.openstack.neutron').setLevel(logging.DEBUG)
+logging.getLogger('api.openstack.heat').setLevel(logging.DEBUG)
+logging.getLogger('api.openstack.heat.parser').setLevel(logging.DEBUG)
+logging.getLogger('api.openstack.glance').setLevel(logging.DEBUG)
+logging.getLogger('api.openstack.helper').setLevel(logging.DEBUG)
 
 
-def create_topology1():
-    # create topology
-    net = DCNetwork(controller=RemoteController, monitor=False, enable_learning=True)
+def create_topology():
+    net = DCNetwork(monitor=False, enable_learning=False)
+
     dc1 = net.addDatacenter("dc1")
-    dc2 = net.addDatacenter("dc2")
-    s1 = net.addSwitch("s1")
-    net.addLink(dc1, s1, delay="10ms")
-    net.addLink(dc2, s1, delay="20ms")
-
-    # add the command line interface endpoint to each DC (REST API)
+    # add OpenStack-like APIs to the emulated DC
+    api1 = OpenstackApiEndpoint("0.0.0.0", 6001)
+    api1.connect_datacenter(dc1)
+    api1.start()
+    api1.connect_dc_network(net)
+    # add the command line interface endpoint to the emulated DC (REST API)
     rapi1 = RestApiEndpoint("0.0.0.0", 5001)
     rapi1.connectDCNetwork(net)
     rapi1.connectDatacenter(dc1)
-    rapi1.connectDatacenter(dc2)
-    # run API endpoint server (in another thread, don't block)
     rapi1.start()
 
-    # add the SONATA dummy gatekeeper to each DC
-    sdkg1 = SonataDummyGatekeeperEndpoint("0.0.0.0", 5000, deploy_sap=False)
-    sdkg1.connectDatacenter(dc1)
-    sdkg1.connectDatacenter(dc2)
-    # run the dummy gatekeeper (in another thread, don't block)
-    sdkg1.start()
-
-    # start the emulation platform
     net.start()
     net.CLI()
-    rapi1.stop()
+    # when the user types exit in the CLI, we stop the emulator
     net.stop()
 
 
 def main():
-    setLogLevel('info')  # set Mininet loglevel
-    create_topology1()
+    create_topology()
 
 
 if __name__ == '__main__':

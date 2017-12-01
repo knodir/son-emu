@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Neither the name of the SONATA-NFV [, ANY ADDITIONAL AFFILIATION]
+# Neither the name of the SONATA-NFV, Paderborn University
 # nor the names of its contributors may be used to endorse or promote
 # products derived from this software without specific prior written
 # permission.
@@ -90,9 +90,7 @@ Vagrant.configure(2) do |config|
   #   vb.gui = true
   #
   #   # Customize the amount of memory on the VM:
-    vb.memory = "4096"
-    vb.cpus = 1
-    # vb.memory = "1024"
+    vb.memory = "1024"
   end
   #
   # View the documentation for the provider you are using for more

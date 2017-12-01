@@ -14,7 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-Neither the name of the SONATA-NFV [, ANY ADDITIONAL AFFILIATION]
+Neither the name of the SONATA-NFV, Paderborn University
 nor the names of its contributors may be used to endorse or promote
 products derived from this software without specific prior written
 permission.
@@ -47,7 +47,7 @@ class SonataDummyGatekeeperEndpoint(object):
     """
 
     def __init__(self, listenip, port, deploy_sap=False, docker_management=False,
-                 auto_deploy=False,  auto_delete=False, sap_vnfd_path=None):
+                 auto_deploy=False,  auto_delete=False, sap_vnfd_path=None, bidirectional=False, placement=None):
         self.dcs = {}
         self.ip = listenip
         self.port = port
@@ -56,6 +56,9 @@ class SonataDummyGatekeeperEndpoint(object):
         dgk.AUTO_DEPLOY = auto_deploy
         dgk.AUTO_DELETE = auto_delete
         dgk.SAP_VNFD = sap_vnfd_path
+        dgk.BIDIRECTIONAL_CHAIN = bidirectional
+        if placement is not None:
+            dgk.PLACEMENT_ALGORITHM = placement
         logging.debug("Created API endpoint %s" % self)
 
     def __repr__(self):

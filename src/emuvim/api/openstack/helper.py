@@ -25,20 +25,14 @@ the Horizon 2020 and 5G-PPP programmes. The authors would like to
 acknowledge the contributions of their colleagues of the SONATA
 partner consortium (www.sonata-nfv.eu).
 """
-import uuid
+from urlparse import urlparse
+import logging
 
+LOG = logging.getLogger("api.openstack.helper")
 
-class Router:
-    def __init__(self, name, id=None):
-        self.name = name
-        self.id = id if id is not None else str(uuid.uuid4())
-        self.subnet_names = list()
-
-    def add_subnet(self, subnet_name):
-        self.subnet_names.append(subnet_name)
-
-    def __eq__(self, other):
-        if self.name == other.name and len(self.subnet_names) == len(other.subnet_names) and \
-                        set(self.subnet_names) == set(other.subnet_names):
-            return True
-        return False
+def get_host(r):
+    try:
+        return urlparse(r.base_url).hostname
+    except:
+        LOG.error("Could not get host part of request URL.")
+    return "0.0.0.0"

@@ -1,10 +1,41 @@
+"""
+Copyright (c) 2017 SONATA-NFV and Paderborn University
+ALL RIGHTS RESERVED.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Neither the name of the SONATA-NFV, Paderborn University
+nor the names of its contributors may be used to endorse or promote
+products derived from this software without specific prior written
+permission.
+
+This work has been performed in the framework of the SONATA project,
+funded by the European Commission under Grant number 671517 through
+the Horizon 2020 and 5G-PPP programmes. The authors would like to
+acknowledge the contributions of their colleagues of the SONATA
+partner consortium (www.sonata-nfv.eu).
+"""
 from flask_restful import Resource
 from flask import Response, request
 from emuvim.api.openstack.openstack_dummies.base_openstack_dummy import BaseOpenstackDummy
+from emuvim.api.openstack.helper import get_host
 import logging
 import json
 import uuid
 from mininet.link import Link
+
+
+LOG = logging.getLogger("api.openstack.nova")
 
 
 class NovaDummyApi(BaseOpenstackDummy):
@@ -41,9 +72,11 @@ class NovaDummyApi(BaseOpenstackDummy):
                               resource_class_kwargs={'api': self})
         self.api.add_resource(NovaListImageById, "/v2.1/<id>/images/<imageid>",
                               resource_class_kwargs={'api': self})
+        self.api.add_resource(NovaLimits, "/v2.1/<id>/limits",
+                              resource_class_kwargs={'api': self})
 
     def _start_flask(self):
-        logging.info("Starting %s endpoint @ http://%s:%d" % ("NovaDummyApi", self.ip, self.port))
+        LOG.info("Starting %s endpoint @ http://%s:%d" % ("NovaDummyApi", self.ip, self.port))
         # add some flavors for good measure
         self.compute.add_flavor('m1.tiny', 1, 512, "MB", 1, "GB")
         self.compute.add_flavor('m1.nano', 1, 64, "MB", 0, "GB")
@@ -60,7 +93,7 @@ class Shutdown(Resource):
     """
 
     def get(self):
-        logging.debug(("%s is beeing shut doen") % (__name__))
+        LOG.debug(("%s is beeing shut doen") % (__name__))
         func = request.environ.get('werkzeug.server.shutdown')
         if func is None:
             raise RuntimeError('Not running with the Werkzeug Server')
@@ -78,7 +111,7 @@ class NovaVersionsList(Resource):
         :return: Returns a json with API versions.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
         try:
             resp = """
                 {
@@ -98,14 +131,14 @@ class NovaVersionsList(Resource):
                         }
                     ]
                 }
-            """ % (self.api.ip, self.api.port)
+            """ % (get_host(request), self.api.port)
 
             response = Response(resp, status=200, mimetype="application/json")
             response.headers['Access-Control-Allow-Origin'] = '*'
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not show list of versions." % __name__)
+            LOG.exception(u"%s: Could not show list of versions." % __name__)
             return ex.message, 500
 
 
@@ -122,7 +155,7 @@ class NovaVersionShow(Resource):
         :return: Returns a json with API details.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
 
         try:
             resp = """
@@ -152,14 +185,14 @@ class NovaVersionShow(Resource):
                     "updated": "2013-07-23T11:33:21Z"
                 }
             }
-            """ % (self.api.ip, self.api.port)
+            """ % (get_host(request), self.api.port)
 
             response = Response(resp, status=200, mimetype="application/json")
             response.headers['Access-Control-Allow-Origin'] = '*'
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not show list of versions." % __name__)
+            LOG.exception(u"%s: Could not show list of versions." % __name__)
             return ex.message, 500
 
 
@@ -176,14 +209,14 @@ class NovaListServersApi(Resource):
         :return: Returns a json response with a dictionary that contains the server information.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
 
         try:
             resp = dict()
             resp['servers'] = list()
             for server in self.api.compute.computeUnits.values():
                 s = server.create_server_dict(self.api.compute)
-                s['links'] = [{'href': "http://%s:%d/v2.1/%s/servers/%s" % (self.api.ip,
+                s['links'] = [{'href': "http://%s:%d/v2.1/%s/servers/%s" % (get_host(request),
                                                                             self.api.port,
                                                                             id,
                                                                             server.id)}]
@@ -195,7 +228,7 @@ class NovaListServersApi(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not retrieve the list of servers." % __name__)
+            LOG.exception(u"%s: Could not retrieve the list of servers." % __name__)
             return ex.message, 500
 
     def post(self, id):
@@ -207,7 +240,7 @@ class NovaListServersApi(Resource):
         :return: Returns a flask response, with detailed information about the just created server.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s POST" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s POST" % str(self.__class__.__name__))
         try:
             server_dict = json.loads(request.data)['server']
             networks = server_dict.get('networks', None)
@@ -221,6 +254,8 @@ class NovaListServersApi(Resource):
             server = self.api.compute.create_server(name)
             server.full_name = str(self.api.compute.dc.label) + "_man_" + server_dict["name"]
             server.template_name = server_dict["name"]
+            if "metadata" in server_dict:
+                server.properties = server_dict["metadata"]
 
             for flavor in self.api.compute.flavors.values():
                 if flavor.id == server_dict.get('flavorRef', ''):
@@ -244,7 +279,7 @@ class NovaListServersApi(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not create the server." % __name__)
+            LOG.exception(u"%s: Could not create the server." % __name__)
             return ex.message, 500
 
 
@@ -262,14 +297,14 @@ class NovaListServersAndPortsApi(Resource):
         :return: Returns a json response with a dictionary that contains the server information.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
 
         try:
             resp = dict()
             resp['servers'] = list()
             for server in self.api.compute.computeUnits.values():
                 s = server.create_server_dict(self.api.compute)
-                s['links'] = [{'href': "http://%s:%d/v2.1/%s/servers/%s" % (self.api.ip,
+                s['links'] = [{'href': "http://%s:%d/v2.1/%s/servers/%s" % (get_host(request),
                                                                             self.api.port,
                                                                             id,
                                                                             server.id)}]
@@ -291,7 +326,7 @@ class NovaListServersAndPortsApi(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not retrieve the list of servers." % __name__)
+            LOG.exception(u"%s: Could not retrieve the list of servers." % __name__)
             return ex.message, 500
 
 
@@ -309,13 +344,13 @@ class NovaListServersDetailed(Resource):
         :return: Returns a flask response, with detailed information aboit the servers and their flavor and image.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
 
         try:
             resp = {"servers": list()}
             for server in self.api.compute.computeUnits.values():
                 s = server.create_server_dict(self.api.compute)
-                s['links'] = [{'href': "http://%s:%d/v2.1/%s/servers/%s" % (self.api.ip,
+                s['links'] = [{'href': "http://%s:%d/v2.1/%s/servers/%s" % (get_host(request),
                                                                             self.api.port,
                                                                             id,
                                                                             server.id)}]
@@ -324,7 +359,7 @@ class NovaListServersDetailed(Resource):
                     "id": flavor.id,
                     "links": [
                         {
-                            "href": "http://%s:%d/v2.1/%s/flavors/%s" % (self.api.ip,
+                            "href": "http://%s:%d/v2.1/%s/flavors/%s" % (get_host(request),
                                                                          self.api.port,
                                                                          id,
                                                                          flavor.id),
@@ -337,7 +372,7 @@ class NovaListServersDetailed(Resource):
                     "id": image.id,
                     "links": [
                         {
-                            "href": "http://%s:%d/v2.1/%s/images/%s" % (self.api.ip,
+                            "href": "http://%s:%d/v2.1/%s/images/%s" % (get_host(request),
                                                                         self.api.port,
                                                                         id,
                                                                         image.id),
@@ -353,7 +388,7 @@ class NovaListServersDetailed(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not retrieve the list of servers." % __name__)
+            LOG.exception(u"%s: Could not retrieve the list of servers." % __name__)
             return ex.message, 500
 
 
@@ -370,7 +405,7 @@ class NovaListFlavors(Resource):
         :return: Returns a flask response with a list of all flavors.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
         try:
             resp = dict()
             resp['flavors'] = list()
@@ -378,7 +413,7 @@ class NovaListFlavors(Resource):
                 f = flavor.__dict__.copy()
                 f['id'] = flavor.id
                 f['name'] = flavor.name
-                f['links'] = [{'href': "http://%s:%d/v2.1/%s/flavors/%s" % (self.api.ip,
+                f['links'] = [{'href': "http://%s:%d/v2.1/%s/flavors/%s" % (get_host(request),
                                                                             self.api.port,
                                                                             id,
                                                                             flavor.id)}]
@@ -389,13 +424,13 @@ class NovaListFlavors(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not retrieve the list of servers." % __name__)
+            LOG.exception(u"%s: Could not retrieve the list of servers." % __name__)
             return ex.message, 500
 
     def post(self, id):
-        logging.debug("API CALL: %s POST" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s POST" % str(self.__class__.__name__))
         data = json.loads(request.data).get("flavor")
-        logging.warning("Create Flavor: %s" % str(data))
+        LOG.warning("Create Flavor: %s" % str(data))
         # add to internal dict
         f = self.api.compute.add_flavor(
             data.get("name"),
@@ -404,7 +439,7 @@ class NovaListFlavors(Resource):
             data.get("disk"), "GB")
         # create response based on incoming data
         data["id"] = f.id
-        data["links"] = [{'href': "http://%s:%d/v2.1/%s/flavors/%s" % (self.api.ip,
+        data["links"] = [{'href': "http://%s:%d/v2.1/%s/flavors/%s" % (get_host(request),
                                                                        self.api.port,
                                                                        id,
                                                                        f.id)}]
@@ -425,7 +460,7 @@ class NovaListFlavorsDetails(Resource):
         :return: Returns a flask response with a list of all flavors with additional information.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
         try:
             resp = dict()
             resp['flavors'] = list()
@@ -434,7 +469,7 @@ class NovaListFlavorsDetails(Resource):
                 # but use a copy so we don't modifiy the original
                 f = flavor.__dict__.copy()
                 # add additional expected stuff stay openstack compatible
-                f['links'] = [{'href': "http://%s:%d/v2.1/%s/flavors/%s" % (self.api.ip,
+                f['links'] = [{'href': "http://%s:%d/v2.1/%s/flavors/%s" % (get_host(request),
                                                                             self.api.port,
                                                                             id,
                                                                             flavor.id)}]
@@ -453,13 +488,13 @@ class NovaListFlavorsDetails(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not retrieve the list of servers." % __name__)
+            LOG.exception(u"%s: Could not retrieve the list of servers." % __name__)
             return ex.message, 500
 
     def post(self, id):
-        logging.debug("API CALL: %s POST" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s POST" % str(self.__class__.__name__))
         data = json.loads(request.data).get("flavor")
-        logging.warning("Create Flavor: %s" % str(data))
+        LOG.warning("Create Flavor: %s" % str(data))
         # add to internal dict
         f = self.api.compute.add_flavor(
             data.get("name"),
@@ -468,7 +503,7 @@ class NovaListFlavorsDetails(Resource):
             data.get("disk"), "GB")
         # create response based on incoming data
         data["id"] = f.id
-        data["links"] = [{'href': "http://%s:%d/v2.1/%s/flavors/%s" % (self.api.ip,
+        data["links"] = [{'href': "http://%s:%d/v2.1/%s/flavors/%s" % (get_host(request),
                                                                        self.api.port,
                                                                        id,
                                                                        f.id)}]
@@ -491,7 +526,7 @@ class NovaListFlavorById(Resource):
         :return: Returns a flask response with detailed information about the flavor.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
         try:
             resp = dict()
             resp['flavor'] = dict()
@@ -503,7 +538,7 @@ class NovaListFlavorById(Resource):
                         break
             resp['flavor']['id'] = flavor.id
             resp['flavor']['name'] = flavor.name
-            resp['flavor']['links'] = [{'href': "http://%s:%d/v2.1/%s/flavors/%s" % (self.api.ip,
+            resp['flavor']['links'] = [{'href': "http://%s:%d/v2.1/%s/flavors/%s" % (get_host(request),
                                                                                      self.api.port,
                                                                                      id,
                                                                                      flavor.id)}]
@@ -512,8 +547,16 @@ class NovaListFlavorById(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not retrieve flavor with id %s" % (__name__, flavorid))
+            LOG.exception(u"%s: Could not retrieve flavor with id %s" % (__name__, flavorid))
             return ex.message, 500
+
+    def delete(self, id, flavorid):
+        """
+        Removes the given flavor.
+        Does not really remove anything from the machine, just fakes an OK.
+        """
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        return Response("{}", status=204, mimetype="application/json")
 
 
 class NovaListImages(Resource):
@@ -529,7 +572,7 @@ class NovaListImages(Resource):
         :return: Returns a flask response with a list of available images.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
         try:
             resp = dict()
             resp['images'] = list()
@@ -537,7 +580,7 @@ class NovaListImages(Resource):
                 f = dict()
                 f['id'] = image.id
                 f['name'] = str(image.name).replace(":latest", "")
-                f['links'] = [{'href': "http://%s:%d/v2.1/%s/images/%s" % (self.api.ip,
+                f['links'] = [{'href': "http://%s:%d/v2.1/%s/images/%s" % (get_host(request),
                                                                            self.api.port,
                                                                            id,
                                                                            image.id)}]
@@ -547,7 +590,7 @@ class NovaListImages(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not retrieve the list of images." % __name__)
+            LOG.exception(u"%s: Could not retrieve the list of images." % __name__)
             return ex.message, 500
 
 
@@ -564,7 +607,7 @@ class NovaListImagesDetails(Resource):
         :return: Returns a flask response with a list of images and their metadata.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
         try:
             resp = dict()
             resp['images'] = list()
@@ -574,7 +617,7 @@ class NovaListImagesDetails(Resource):
                 f = image.__dict__.copy()
                 # add additional expected stuff stay openstack compatible
                 f['name'] = str(image.name).replace(":latest", "")
-                f['links'] = [{'href': "http://%s:%d/v2.1/%s/images/%s" % (self.api.ip,
+                f['links'] = [{'href': "http://%s:%d/v2.1/%s/images/%s" % (get_host(request),
                                                                            self.api.port,
                                                                            id,
                                                                            image.id)}]
@@ -591,7 +634,7 @@ class NovaListImagesDetails(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not retrieve the list of images." % __name__)
+            LOG.exception(u"%s: Could not retrieve the list of images." % __name__)
             return ex.message, 500
 
 
@@ -610,7 +653,7 @@ class NovaListImageById(Resource):
         :return: Returns a flask response with the information about one image.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
         try:
             resp = dict()
             i = resp['image'] = dict()
@@ -626,8 +669,16 @@ class NovaListImageById(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not retrieve image with id %s." % (__name__, imageid))
+            LOG.exception(u"%s: Could not retrieve image with id %s." % (__name__, imageid))
             return ex.message, 500
+
+    def delete(self, id, imageid):
+        """
+        Removes the given image.
+        Does not really remove anything from the machine, just fakes an OK.
+        """
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        return Response("{}", status=204, mimetype="application/json")
 
 
 class NovaShowServerDetails(Resource):
@@ -645,13 +696,13 @@ class NovaShowServerDetails(Resource):
         :return: Returns a flask response with details about the server.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
         try:
             server = self.api.compute.find_server_by_name_or_id(serverid)
             if server is None:
                 return Response("Server with id or name %s does not exists." % serverid, status=404)
             s = server.create_server_dict()
-            s['links'] = [{'href': "http://%s:%d/v2.1/%s/servers/%s" % (self.api.ip,
+            s['links'] = [{'href': "http://%s:%d/v2.1/%s/servers/%s" % (get_host(request),
                                                                         self.api.port,
                                                                         id,
                                                                         server.id)}]
@@ -661,7 +712,7 @@ class NovaShowServerDetails(Resource):
                 "id": flavor.id,
                 "links": [
                     {
-                        "href": "http://%s:%d/v2.1/%s/flavors/%s" % (self.api.ip,
+                        "href": "http://%s:%d/v2.1/%s/flavors/%s" % (get_host(request),
                                                                      self.api.port,
                                                                      id,
                                                                      flavor.id),
@@ -674,7 +725,7 @@ class NovaShowServerDetails(Resource):
                 "id": image.id,
                 "links": [
                     {
-                        "href": "http://%s:%d/v2.1/%s/images/%s" % (self.api.ip,
+                        "href": "http://%s:%d/v2.1/%s/images/%s" % (get_host(request),
                                                                     self.api.port,
                                                                     id,
                                                                     image.id),
@@ -688,7 +739,7 @@ class NovaShowServerDetails(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not retrieve the server details." % __name__)
+            LOG.exception(u"%s: Could not retrieve the server details." % __name__)
             return ex.message, 500
 
     def delete(self, id, serverid):
@@ -702,7 +753,7 @@ class NovaShowServerDetails(Resource):
         :return: Returns 200 if everything is fine.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s POST" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s POST" % str(self.__class__.__name__))
         try:
             server = self.api.compute.find_server_by_name_or_id(serverid)
             if server is None:
@@ -715,7 +766,7 @@ class NovaShowServerDetails(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not create the server." % __name__)
+            LOG.exception(u"%s: Could not create the server." % __name__)
             return ex.message, 500
 
 
@@ -734,14 +785,14 @@ class NovaInterfaceToServer(Resource):
         :return: Returns a flask response with information about the attached interface.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
         try:
             server = self.api.compute.find_server_by_name_or_id(serverid)
             if server is None:
                 return Response("Server with id or name %s does not exists." % serverid, status=404)
 
             if server.emulator_compute is None:
-                logging.error("The targeted container does not exist.")
+                LOG.error("The targeted container does not exist.")
                 return Response("The targeted container of %s does not exist." % serverid, status=404)
             data = json.loads(request.data).get("interfaceAttachment")
             resp = dict()
@@ -798,7 +849,7 @@ class NovaInterfaceToServer(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not add interface to the server." % __name__)
+            LOG.exception(u"%s: Could not add interface to the server." % __name__)
             return ex.message, 500
 
 
@@ -820,7 +871,7 @@ class NovaShowAndDeleteInterfaceAtServer(Resource):
          error message.
         :rtype: :class:`flask.response`
         """
-        logging.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
         try:
             server = self.api.compute.find_server_by_name_or_id(serverid)
             if server is None:
@@ -840,5 +891,58 @@ class NovaShowAndDeleteInterfaceAtServer(Resource):
             return response
 
         except Exception as ex:
-            logging.exception(u"%s: Could not detach interface from the server." % __name__)
+            LOG.exception(u"%s: Could not detach interface from the server." % __name__)
+            return ex.message, 500
+
+
+class NovaLimits(Resource):
+    def __init__(self, api):
+        self.api = api
+
+    def get(self, id):
+        """
+        Returns the resource limits of the emulated cloud.
+        https://developer.openstack.org/api-ref/compute/?expanded=show-rate-and-absolute-limits-detail#limits-limits
+
+        TODO: For now we only return fixed limits, not based on the real deployment.
+
+        :param id: tenant id, used for the 'href' link
+        :type id: ``str``
+        :return: Returns the resource limits.
+        :rtype: :class:`flask.response`
+        """
+        LOG.debug("API CALL: %s GET" % str(self.__class__.__name__))
+        try:
+            resp = {
+                "limits": {
+                    "absolute": {
+                        "maxImageMeta": 12800,
+                        "maxPersonality": 500,
+                        "maxPersonalitySize": 1024000,
+                        "maxSecurityGroupRules": 2000,
+                        "maxSecurityGroups": 1000,
+                        "maxServerMeta": 12800,
+                        "maxTotalCores": 2000,
+                        "maxTotalFloatingIps": 1000,
+                        "maxTotalInstances": 1000,
+                        "maxTotalKeypairs": 1000,
+                        "maxTotalRAMSize": 5120000,
+                        "maxServerGroups": 1000,
+                        "maxServerGroupMembers": 1000,
+                        "totalCoresUsed": 0,
+                        "totalInstancesUsed": 0,
+                        "totalRAMUsed": 0,
+                        "totalSecurityGroupsUsed": 0,
+                        "totalFloatingIpsUsed": 0,
+                        "totalServerGroupsUsed": 0
+                    },
+                    "rate": []
+                }
+            }
+            response = Response(json.dumps(resp), status=200, mimetype="application/json")
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            return response
+
+        except Exception as ex:
+            LOG.exception(u"%s: Could not retrieve the list of images." % __name__)
             return ex.message, 500

@@ -14,7 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-Neither the name of the SONATA-NFV [, ANY ADDITIONAL AFFILIATION]
+Neither the name of the SONATA-NFV, Paderborn University
 nor the names of its contributors may be used to endorse or promote
 products derived from this software without specific prior written
 permission.
@@ -28,6 +28,7 @@ partner consortium (www.sonata-nfv.eu).
 from mininet.node import Docker, OVSBridge
 from mininet.link import Link
 from emuvim.dcemulator.resourcemodel import NotEnoughResourcesAvailable
+import threading
 import logging
 
 
@@ -66,8 +67,11 @@ class EmulatorCompute(Docker):
             vnf_name = self.name
             vnf_interface = str(i)
             dc_port_name = self.datacenter.net.find_connected_dc_interface(vnf_name, vnf_interface)
+            id = "{0}:{1}".format(vnf_name, vnf_interface)
+            vlan_tag = self.datacenter.net.vlan_dict.get(id)
             # format list of tuples (name, Ip, MAC, isUp, status, dc_portname)
-            intf_dict = {'intf_name': str(i), 'ip': "{0}/{1}".format(i.IP(), i.prefixLen), 'netmask': i.prefixLen, 'mac': i.MAC(), 'up': i.isUp(), 'status': i.status(), 'dc_portname': dc_port_name}
+            intf_dict = {'intf_name': str(i), 'ip': "{0}/{1}".format(i.IP(), i.prefixLen), 'netmask': i.prefixLen,
+                         'mac': i.MAC(), 'up': i.isUp(), 'status': i.status(), 'dc_portname': dc_port_name, 'vlan': vlan_tag}
             networkStatusList.append(intf_dict)
 
         return networkStatusList
@@ -208,7 +212,7 @@ class Datacenter(object):
     def start(self):
         pass
 
-    def startCompute(self, name, image=None, command=None, network=None, flavor_name="tiny", **params):
+    def startCompute(self, name, image=None, command=None, network=None, flavor_name="tiny", properties=dict(), **params):
         """
         Create a new container as compute resource and connect it to this
         data center.
@@ -217,6 +221,7 @@ class Datacenter(object):
         :param command: command (string)
         :param network: networks list({"ip": "10.0.0.254/8"}, {"ip": "11.0.0.254/24"})
         :param flavor_name: name of the flavor for this compute container
+        :param properties: dictionary of properties (key-value) that will be passed as environment variables
         :return:
         """
         assert name is not None
@@ -240,6 +245,8 @@ class Datacenter(object):
             params['cpu_period'] = self.net.cpu_period
             params['cpu_quota'] = self.net.cpu_period * float(cpu_percentage)
 
+        env = properties
+        properties['VNF_NAME'] = name
         # create the container
         d = self.net.addDocker(
             "%s" % (name),
@@ -247,7 +254,7 @@ class Datacenter(object):
             dcmd=command,
             datacenter=self,
             flavor_name=flavor_name,
-            environment = {'VNF_NAME':name},
+            environment = env,
             **params
         )
 

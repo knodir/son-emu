@@ -14,7 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-Neither the name of the SONATA-NFV [, ANY ADDITIONAL AFFILIATION]
+Neither the name of the SONATA-NFV, Paderborn University
 nor the names of its contributors may be used to endorse or promote
 products derived from this software without specific prior written
 permission.
@@ -38,7 +38,7 @@ from compute import dcs, ComputeList, Compute, ComputeResources, DatacenterList,
 
 # need to import total module to set its global variable net
 import network
-from network import NetworkAction, DrawD3jsgraph
+from network import NetworkAction, NetworkLAN, DrawD3jsgraph
 
 import monitor
 from monitor import MonitorInterfaceAction, MonitorFlowAction, MonitorLinkAction, MonitorSkewAction, MonitorTerminal
@@ -46,7 +46,7 @@ from monitor import MonitorInterfaceAction, MonitorFlowAction, MonitorLinkAction
 import pkg_resources
 from os import path
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig()
 
 
 class RestApiEndpoint(object):
@@ -88,6 +88,8 @@ class RestApiEndpoint(object):
         # network related actions (setup chaining between VNFs)
         self.api.add_resource(NetworkAction,
                               "/restapi/network")
+        self.api.add_resource(NetworkLAN,
+                              "/restapi/networkLAN")
         self.api.add_resource(DrawD3jsgraph,
                               "/restapi/network/d3jsgraph")
 
@@ -127,17 +129,21 @@ class RestApiEndpoint(object):
             self.__class__.__name__, self.ip, self.port))
 
     def start(self):
-        thread = threading.Thread(target=self._start_flask, args=())
-        thread.daemon = True
-        thread.start()
+        self.thread = threading.Thread(target=self._start_flask, args=())
+        self.thread.daemon = True
+        self.thread.start()
         logging.info("Started API endpoint @ http://%s:%d" % (self.ip, self.port))
+
+    def stop(self):
+        if self.http_server:
+            self.http_server.close()
 
     def _start_flask(self):
         #self.app.run(self.ip, self.port, debug=False, use_reloader=False)
         #this should be a more production-fit http-server
         #self.app.logger.setLevel(logging.ERROR)
-        http_server = WSGIServer((self.ip, self.port),
+        self.http_server = WSGIServer((self.ip, self.port),
                                  self.app,
                                  log=open("/dev/null", "w")  # This disables HTTP request logs to not mess up the CLI when e.g. the auto-updated dashboard is used
         )
-        http_server.serve_forever()
+        self.http_server.serve_forever()

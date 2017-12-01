@@ -28,17 +28,22 @@ partner consortium (www.sonata-nfv.eu).
 import uuid
 
 
-class Router:
-    def __init__(self, name, id=None):
+class PortPairGroup(object):
+    def __init__(self, name):
+        self.id = str(uuid.uuid4())
+        self.tenant_id = "abcdefghijklmnopqrstuvwxyz123456"
         self.name = name
-        self.id = id if id is not None else str(uuid.uuid4())
-        self.subnet_names = list()
+        self.description = ""
+        self.port_pairs = list()
+        self.port_pair_group_parameters = dict()
 
-    def add_subnet(self, subnet_name):
-        self.subnet_names.append(subnet_name)
-
-    def __eq__(self, other):
-        if self.name == other.name and len(self.subnet_names) == len(other.subnet_names) and \
-                        set(self.subnet_names) == set(other.subnet_names):
-            return True
-        return False
+    def create_dict(self, compute):
+        representation = {
+            "name": self.name,
+            "tenant_id": self.tenant_id,
+            "description": self.description,
+            "port_pairs": self.port_pairs,
+            "port_pair_group_parameters": self.port_pair_group_parameters,
+            "id": self.id
+        }
+        return representation
