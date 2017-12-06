@@ -463,11 +463,12 @@ def plumb_chains(net, vnfs, num_of_chains):
     for vnf_name_and_obj in vnfs['vpn']:
         vnf_name = vnf_name_and_obj.keys()[0]
         # execute /start.sh script inside VPN client to connect to VPN server.
-        # cmds.append(
-        #    'sudo docker exec -i mn.%s /bin/bash /start.sh &' % vnf_name)
+        cmds.append(
+           'sudo docker exec -i mn.%s /bin/bash /start.sh &' % vnf_name)
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "echo 1 > /proc/sys/net/ipv4/ip_forward"' % vnf_name)
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "echo 1 > /proc/sys/net/ipv4/conf/all/proxy_arp"' % vnf_name)
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 input-ids"' % vnf_name)
+        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route del 10.0.10.10"' % vnf_name)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -700,7 +701,7 @@ if __name__ == '__main__':
                 if alloc.startswith('allocation'):
                     num_of_chains += 1
             glog.info('allocs: %s; num_of_chains = %d', allocs, num_of_chains)
-            # num_of_chains = 20
+            num_of_chains = 1
             # sys.exit(0)
             # allocate chains by placing them on appropriate servers
             vnfs = allocate_chains(dcs, allocs, num_of_chains)
@@ -708,7 +709,7 @@ if __name__ == '__main__':
             plumb_chains(net, vnfs, num_of_chains)
             glog.info('successfully plumbed %d chains', num_of_chains)
             glog.info('Chain setup done. You should see the terminal now.')
-            CLI(net)
+            # CLI(net)
             algo = algo + str(compute) + "_"
             benchmark(algo=algo, line=num_of_chains, mbps=mbps)
             net.stop()
