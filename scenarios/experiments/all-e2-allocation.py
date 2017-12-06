@@ -6,11 +6,13 @@ import logging
 import json
 import os
 import glog
-
+import inspect
+sys.path.append('../../src/')
 from emuvim.dcemulator.net import DCNetwork
 from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
 from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM
 
+from mininet.cli import CLI
 from mininet.node import RemoteController
 from mininet.clean import cleanup
 from mininet.node import DefaultController
@@ -63,16 +65,17 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     # because of the contention between OVS and cgroup mem limitation) and
     # Sonata VM OOM killer starts killing random processes.
 
-    net = DCNetwork(controller=RemoteController, monitor=False,
+    net = DCNetwork(controller=DefaultController, monitor=False,
                     dc_emulation_max_cpu=max_cu_net,
                     dc_emulation_max_mem=max_mu_net,
-                    enable_learning=True)
+                    enable_learning=False)
 
     # Read physical topology from file.
     with open(pn_fname) as data_file:
         data = json.load(data_file)
 
-    glog.info('read data center description from JSON file %s' % data['Servers'])
+    glog.info('read data center description from JSON file %s' %
+              data['Servers'])
 
     dcs = {}
     for name, props in data['Servers'].iteritems():
@@ -86,7 +89,8 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
 
     for dc_name, dc_obj in dcs.iteritems():
         dc_obj.assignResourceModel(rms[dc_name])
-        glog.info('assigned resource model %s to %s', id(rms[dc_name]), dc_name)
+        glog.info('assigned resource model %s to %s',
+                  id(rms[dc_name]), dc_name)
 
     glog.info('PN read from JSON file %s' % data['PN'])
 
@@ -126,7 +130,7 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
 
     for pn_item in data['PN']:
         net.addLink(dcs[pn_item[0]], tors[pn_item[1]])
-
+        os.system('sudo ovs-vsctl set Bridge' + dcs[pn_item[0]].name + ' rstp_enable=true')
     glog.info('added link from DCs to ToR')
 
     # create REST API endpoint
@@ -221,16 +225,18 @@ def get_placement(pn_fname, vn_fname, algo):
     return allocs
 
 
-def allocate_chains(dcs, allocs):
+def allocate_chains(dcs, allocs, num_of_chains):
     """ Create chains by assigning VNF to their respective server. """
 
     fl = "large"
     chain_index = 0
     # vnfs holds array of each VNF type
-    vnfs = {'source': [], 'nat': [], 'fw': [], 'ids': [], 'vpn': [], 'sink': []}
-
+    vnfs = {'source': [], 'nat': [], 'fw': [],
+            'ids': [], 'vpn': [], 'sink': []}
     # iterate over each allocation and create each chain
     for alloc_name, chain_mapping in allocs.iteritems():
+        if chain_index >= num_of_chains:
+            break
         if not alloc_name.startswith('allocation'):
             glog.info('not an allocation, but metadata: %s', alloc_name)
             continue
@@ -276,9 +282,10 @@ def allocate_chains(dcs, allocs):
                 # node-upgrade experiment requires knodir/sonata-fw-vnf:upgrade
                 # image as it has an additional interface for ids2.
                 vnf_obj = dcs[server_name].startCompute(vnf_id,
-                                                        image='knodir/sonata-fw-iptables', flavor_name="fw",
+                                                        image='knodir/sonata-fw-iptables2', flavor_name="fw",
                                                         network=[{'id': 'input', 'ip': '10.0.1.5/24'},
-                                                                 {'id': 'output-ids', 'ip': '10.0.1.61/24'},
+                                                                 {'id': 'output-ids',
+                                                                     'ip': '10.0.1.61/24'},
                                                                  {'id': 'output-vpn', 'ip': '10.0.2.4/24'}])
                 vnfs[vnf_name].append({vnf_id: vnf_obj})
                 # os.system("sudo docker update --cpu-shares 200000 " + vnf_id)
@@ -298,7 +305,8 @@ def allocate_chains(dcs, allocs):
                 vnf_obj = dcs[server_name].startCompute(vnf_id,
                                                         image='knodir/vpn-client', flavor_name="vpn",
                                                         network=[{'id': 'input-ids', 'ip': '10.0.1.91/24'},
-                                                                 {'id': 'input-fw', 'ip': '10.0.2.5/24'},
+                                                                 {'id': 'input-fw',
+                                                                     'ip': '10.0.2.5/24'},
                                                                  {'id': 'output', 'ip': '10.0.10.2/24'}])
                 vnfs[vnf_name].append({vnf_id: vnf_obj})
 
@@ -338,14 +346,22 @@ def plumb_chains(net, vnfs, num_of_chains):
     vnf_index = 0
     for vnf_name_and_obj in vnfs['fw']:
         vnf_name = vnf_name_and_obj.keys()[0]
-        cmds.append('sudo docker exec mn.%s /root/start.sh %s &' % (vnf_name, vnf_index))
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.10.0/24 dev output-ids"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route del -net 10.0.1.0/24 dev output-ids"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route del -net 10.0.1.0/24 dev input"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.8.0.0/24 dev output-ids"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 dev input"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.1.0/26 dev input"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.1.0/24 dev output-ids"' % vnf_name)
+        cmds.append('sudo docker exec mn.%s /root/start.sh %s &' %
+                    (vnf_name, vnf_index))
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.10.0/24 dev output-ids"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "route del -net 10.0.1.0/24 dev output-ids"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "route del -net 10.0.1.0/24 dev input"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.8.0.0/24 dev output-ids"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 dev input"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.1.0/26 dev input"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.1.0/24 dev output-ids"' % vnf_name)
         vnf_index = vnf_index + 1
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -356,7 +372,17 @@ def plumb_chains(net, vnfs, num_of_chains):
     time.sleep(2)
     glog.info('< wait complete')
     glog.info('fw start done')
-
+    # try:
+    #     input('Pause1 ')
+    # except SyntaxError:
+    #     print('Proceeding')
+    # execute /start.sh script inside nat image. It attaches both input
+    # and output interfaces to OVS bridge to enable packet forwarding.
+    for vnf_name_and_obj in vnfs['nat']:
+        vnf_name = vnf_name_and_obj.keys()[0]
+        cmd = 'sudo docker exec -i mn.%s /bin/bash /start.sh' % vnf_name
+        execStatus = subprocess.call(cmd, shell=True)
+        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
     # execute /start.sh script inside ids image. It bridges input and output
     # interfaces with br0, and starts ids process listering on br0.
     for vnf_name_and_obj in vnfs['ids']:
@@ -365,74 +391,83 @@ def plumb_chains(net, vnfs, num_of_chains):
         execStatus = subprocess.call(cmd, shell=True)
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
 
-    # execute /start.sh script inside nat image. It attaches both input
-    # and output interfaces to OVS bridge to enable packet forwarding.
-    for vnf_name_and_obj in vnfs['nat']:
-        vnf_name = vnf_name_and_obj.keys()[0]
-        cmd = 'sudo docker exec -i mn.%s /bin/bash /start.sh' % vnf_name
-        execStatus = subprocess.call(cmd, shell=True)
-        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
-
     glog.info('> sleeping 2s to let fw, ids, nat initialize properly...')
     time.sleep(2)
     glog.info('< 5s wait complete')
     glog.info('start VNF chaining')
-
     # chain 'client <-> nat <-> fw <-> ids <-> vpn <-> server'
     for chain_index in range(num_of_chains):
         pair_src_name = vnfs['source'][chain_index].keys()[0]
         pair_dst_name = vnfs['nat'][chain_index].keys()[0]
         res = net.setChain(pair_src_name, pair_dst_name, 'intf1', 'input',
                            bidirectional=True, cmd='add-flow')
-        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+        glog.info('chain(%s, %s) output: %s',
+                  pair_src_name, pair_dst_name, res)
 
         pair_src_name = vnfs['nat'][chain_index].keys()[0]
         pair_dst_name = vnfs['fw'][chain_index].keys()[0]
         res = net.setChain(pair_src_name, pair_dst_name, 'output', 'input',
                            bidirectional=True, cmd='add-flow')
-        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+        glog.info('chain(%s, %s) output: %s',
+                  pair_src_name, pair_dst_name, res)
 
         pair_src_name = vnfs['fw'][chain_index].keys()[0]
         pair_dst_name = vnfs['ids'][chain_index].keys()[0]
         res = net.setChain(pair_src_name, pair_dst_name, 'output-ids', 'input',
                            bidirectional=True, cmd='add-flow')
-        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+        glog.info('chain(%s, %s) output: %s',
+                  pair_src_name, pair_dst_name, res)
 
         pair_src_name = vnfs['fw'][chain_index].keys()[0]
         pair_dst_name = vnfs['vpn'][chain_index].keys()[0]
         res = net.setChain(pair_src_name, pair_dst_name, 'output-vpn', 'input-fw',
                            bidirectional=True, cmd='add-flow')
-        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+        glog.info('chain(%s, %s) output: %s',
+                  pair_src_name, pair_dst_name, res)
 
         pair_src_name = vnfs['ids'][chain_index].keys()[0]
         pair_dst_name = vnfs['vpn'][chain_index].keys()[0]
         res = net.setChain(pair_src_name, pair_dst_name, 'output', 'input-ids',
                            bidirectional=True, cmd='add-flow')
-        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+        glog.info('chain(%s, %s) output: %s',
+                  pair_src_name, pair_dst_name, res)
 
         pair_src_name = vnfs['vpn'][chain_index].keys()[0]
         pair_dst_name = vnfs['sink'][chain_index].keys()[0]
         res = net.setChain(pair_src_name, pair_dst_name, 'output', 'intf2',
                            bidirectional=True, cmd='add-flow')
-        glog.info('chain(%s, %s) output: %s', pair_src_name, pair_dst_name, res)
+        glog.info('chain(%s, %s) output: %s',
+                  pair_src_name, pair_dst_name, res)
 
     for vnf_name_and_obj in vnfs['sink']:
         vnf_name = vnf_name_and_obj.keys()[0]
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 dev intf2"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/8 dev intf2"' % vnf_name)
         # start openvpn server and related services inside openvpn server
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ufw enable"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "ufw enable"' % vnf_name)
         # open iperf3 port (5201) on firewall (ufw)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ufw allow 5201"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ufw status"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "service openvpn start"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "service openvpn status"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "service rsyslog start"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "service rsyslog status"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "ufw allow 5201"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "ufw status"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "service openvpn start"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "service openvpn status"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "service rsyslog start"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "service rsyslog status"' % vnf_name)
 
     for vnf_name_and_obj in vnfs['vpn']:
         vnf_name = vnf_name_and_obj.keys()[0]
         # execute /start.sh script inside VPN client to connect to VPN server.
-        cmds.append('sudo docker exec -i mn.%s /bin/bash /start.sh &' % vnf_name)
+        # cmds.append(
+        #    'sudo docker exec -i mn.%s /bin/bash /start.sh &' % vnf_name)
+        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "echo 1 > /proc/sys/net/ipv4/ip_forward"' % vnf_name)
+        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "echo 1 > /proc/sys/net/ipv4/conf/all/proxy_arp"' % vnf_name)
+        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 input-ids"' % vnf_name)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -447,24 +482,37 @@ def plumb_chains(net, vnfs, num_of_chains):
     for vnf_name_and_obj in vnfs['nat']:
         vnf_name = vnf_name_and_obj.keys()[0]
         # rewrite NAT VNF MAC addresses for tcpreplay
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ifconfig input hw ether 00:00:00:00:00:02"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.10.0/24 dev output"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ip route add 10.8.0.0/24 dev output"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "ifconfig input hw ether 00:00:00:00:00:02"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.10.0/24 dev output"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "ip route add 10.8.0.0/24 dev output"' % vnf_name)
 
-    for vnf_name_and_obj in vnfs['vpn']:
-        vnf_name = vnf_name_and_obj.keys()[0]
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ip route del 10.0.10.10/32"' % vnf_name)
+    # for vnf_name_and_obj in vnfs['vpn']:
+    #     vnf_name = vnf_name_and_obj.keys()[0]
+    #     # cmds.append(
+    #     #    'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids"' % vnf_name)
+    #     # cmds.append(
+    #     #    'sudo docker exec -i mn.%s /bin/bash -c "ip route del 10.0.10.10/32"' % vnf_name)
+    #     # cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route del -net 10.0.1.0/24 input-ids"' % vnf_name)
+    #     cmds.append('route add -net 10.0.0.0/8 input-ids')
+    #     cmds.append('route add -net 10.0.0.0/8 input-ids')
 
     for vnf_name_and_obj in vnfs['source']:
         vnf_name = vnf_name_and_obj.keys()[0]
         # rewrite client VNF MAC addresses for tcpreplay
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ifconfig intf1 hw ether 00:00:00:00:00:01"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "ifconfig intf1 hw ether 00:00:00:00:00:01"' % vnf_name)
         # manually chain routing table entries on VNFs
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/16 dev intf1"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.8.0.0/24 dev intf1"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ping -i 0.1 -c 10 10.0.10.10"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "ping -i 0.1 -c 10 10.8.0.1"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/16 dev intf1"' % vnf_name)
+        cmds.append(
+            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.8.0.0/24 dev intf1"' % vnf_name)
+        # cmds.append(
+        #     'sudo docker exec -i mn.%s /bin/bash -c "ping -i 0.1 -c 10 10.0.10.10"' % vnf_name)
+        # cmds.append(
+        #     'sudo docker exec -i mn.%s /bin/bash -c "ping -i 0.1 -c 10 10.8.0.1"' % vnf_name)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -492,11 +540,15 @@ def benchmark(algo, line, mbps):
 
     # kill existing tcpreplay and dstat, and copy traces to the source VNF
     for chain_index in range(num_of_chains):
-        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "pkill tcpreplay"' % chain_index)
-        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "pkill python2"' % chain_index)
+        cmds.append(
+            'sudo docker exec -i mn.chain%d-source /bin/bash -c "pkill tcpreplay"' % chain_index)
+        cmds.append(
+            'sudo docker exec -i mn.chain%d-sink /bin/bash -c "pkill python2"' % chain_index)
         # remove stale dstat output file (if any)
-        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "rm /tmp/dstat.csv"' % chain_index)
-        cmds.append('sudo docker cp ../traces/output2.pcap mn.chain%d-source:/' % chain_index)
+        cmds.append(
+            'sudo docker exec -i mn.chain%d-sink /bin/bash -c "rm /tmp/dstat.csv"' % chain_index)
+        cmds.append(
+            'sudo docker cp ../traces/output2.pcap mn.chain%d-source:/' % chain_index)
 
     cmds.append('sudo rm -f ./results/allocation/%s%s/*.csv' %
                 (algo, str(mbps)))
@@ -507,7 +559,8 @@ def benchmark(algo, line, mbps):
     cmds[:] = []
 
     for chain_index in range(num_of_chains):
-        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "dstat --net --time -N intf2 --bits --output /tmp/dstat.csv" &' % chain_index)
+        cmds.append(
+            'sudo docker exec -i mn.chain%d-sink /bin/bash -c "dstat --net --time -N intf2 --bits --output /tmp/dstat.csv" &' % chain_index)
         # cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "iperf3 -s" &' % chain_index)
 
     for cmd in cmds:
@@ -536,10 +589,14 @@ def benchmark(algo, line, mbps):
 
     # kill existing tcpreplay and dstat
     for chain_index in range(num_of_chains):
-        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "pkill tcpreplay"' % chain_index)
-        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "pkill python2"' % chain_index)
-        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "killall iperf3"' % chain_index)
-        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "killall iperf3"' % chain_index)
+        cmds.append(
+            'sudo docker exec -i mn.chain%d-source /bin/bash -c "pkill tcpreplay"' % chain_index)
+        cmds.append(
+            'sudo docker exec -i mn.chain%d-sink /bin/bash -c "pkill python2"' % chain_index)
+        cmds.append(
+            'sudo docker exec -i mn.chain%d-source /bin/bash -c "killall iperf3"' % chain_index)
+        cmds.append(
+            'sudo docker exec -i mn.chain%d-sink /bin/bash -c "killall iperf3"' % chain_index)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -565,7 +622,8 @@ def benchmark(algo, line, mbps):
 
     # remove dstat output files
     for chain_index in range(num_of_chains):
-        cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "rm /tmp/dstat.csv"' % chain_index)
+        cmds.append(
+            'sudo docker exec -i mn.chain%d-sink /bin/bash -c "rm /tmp/dstat.csv"' % chain_index)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -614,7 +672,7 @@ if __name__ == '__main__':
     algos = ['daisy', 'random', 'packing']
     bandwidths = [10]
     # algos = ['daisy']
-
+    print(inspect.getmodule(DCNetwork).__file__)
     for mbps in bandwidths:
         for algo in algos:
             # start API and containernet
@@ -623,10 +681,12 @@ if __name__ == '__main__':
                 net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
             elif topology == "2":
                 # e2-azure-1rack-50servers with 10 compute
-                net, api, dcs, tors = prepareDC(pn_fname, 10, 8704, 600, 417792)
+                net, api, dcs, tors = prepareDC(
+                    pn_fname, 10, 8704, 600, 417792)
             else:
                 # e2-azure-1rack-50servers with 20 compute
-                net, api, dcs, tors = prepareDC(pn_fname, 20, 8704, 1200, 417792)
+                net, api, dcs, tors = prepareDC(
+                    pn_fname, 20, 8704, 1200, 417792)
             api.start()
             net.start()
 
@@ -639,15 +699,16 @@ if __name__ == '__main__':
             for alloc in allocs:
                 if alloc.startswith('allocation'):
                     num_of_chains += 1
-
             glog.info('allocs: %s; num_of_chains = %d', allocs, num_of_chains)
+            # num_of_chains = 20
             # sys.exit(0)
             # allocate chains by placing them on appropriate servers
-            vnfs = allocate_chains(dcs, allocs)
+            vnfs = allocate_chains(dcs, allocs, num_of_chains)
             # configure the datapath on chains to push packets through them
             plumb_chains(net, vnfs, num_of_chains)
             glog.info('successfully plumbed %d chains', num_of_chains)
             glog.info('Chain setup done. You should see the terminal now.')
+            CLI(net)
             algo = algo + str(compute) + "_"
             benchmark(algo=algo, line=num_of_chains, mbps=mbps)
             net.stop()

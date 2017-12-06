@@ -14,7 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-Neither the name of the SONATA-NFV [, ANY ADDITIONAL AFFILIATION]
+Neither the name of the SONATA-NFV, Paderborn University
 nor the names of its contributors may be used to endorse or promote
 products derived from this software without specific prior written
 permission.
@@ -34,6 +34,7 @@ import re
 import requests
 import os
 import json
+import distutils
 
 from mininet.net import Containernet
 from mininet.node import Controller, DefaultController, OVSSwitch, OVSKernelSwitch, Docker, RemoteController
@@ -56,6 +57,7 @@ DEFAULT_PRIORITY = 1000
 # default cookie number for new flow-rules
 DEFAULT_COOKIE = 10
 
+
 class DCNetwork(Containernet):
     """
     Wraps the original Mininet/Containernet class and provides
@@ -65,7 +67,7 @@ class DCNetwork(Containernet):
     """
 
     def __init__(self, controller=RemoteController, monitor=False,
-                 enable_learning=False, # learning switch behavior of the default ovs switches icw Ryu controller can be turned off/on, needed for E-LAN functionality
+                 enable_learning=False,  # learning switch behavior of the default ovs switches icw Ryu controller can be turned off/on, needed for E-LAN functionality
                  dc_emulation_max_cpu=1.0,  # fraction of overall CPU time for emulation
                  dc_emulation_max_mem=512,  # emulation max mem in MB
                  **kwargs):
@@ -78,12 +80,11 @@ class DCNetwork(Containernet):
         # members
         self.dcs = {}
         self.ryu_process = None
-        #list of deployed nsds.E_Lines and E_LANs (uploaded from the dummy gatekeeper)
+        # list of deployed nsds.E_Lines and E_LANs (uploaded from the dummy gatekeeper)
         self.deployed_nsds = []
         self.deployed_elines = []
         self.deployed_elans = []
-        self.installed_chains = []
-
+        self.vlan_dict = {}
 
         # always cleanup environment before we start the emulator
         self.killRyu()
@@ -95,7 +96,7 @@ class DCNetwork(Containernet):
 
         # default switch configuration
         enable_ryu_learning = False
-        if enable_learning :
+        if enable_learning:
             self.failMode = 'standalone'
             enable_ryu_learning = True
         else:
@@ -113,7 +114,7 @@ class DCNetwork(Containernet):
         self.DCNetwork_graph = nx.MultiDiGraph()
 
         # initialize pool of vlan tags to setup the SDN paths
-        self.vlans = range(2, 4096)[::-1]
+        self.vlans = range(1, 4095)[::-1]
 
         # link to Ryu REST_API
         ryu_ip = 'localhost'
@@ -154,24 +155,24 @@ class DCNetwork(Containernet):
         assert node2 is not None
 
         # ensure type of node1
-        if isinstance( node1, basestring ):
+        if isinstance(node1, basestring):
             if node1 in self.dcs:
                 node1 = self.dcs[node1].switch
-        if isinstance( node1, Datacenter ):
+        if isinstance(node1, Datacenter):
             node1 = node1.switch
         # ensure type of node2
-        if isinstance( node2, basestring ):
+        if isinstance(node2, basestring):
             if node2 in self.dcs:
                 node2 = self.dcs[node2].switch
-        if isinstance( node2, Datacenter ):
+        if isinstance(node2, Datacenter):
             node2 = node2.switch
         # try to give containers a default IP
-        if isinstance( node1, Docker ):
+        if isinstance(node1, Docker):
             if "params1" not in params:
                 params["params1"] = {}
             if "ip" not in params["params1"]:
                 params["params1"]["ip"] = self.getNextIp()
-        if isinstance( node2, Docker ):
+        if isinstance(node2, Docker):
             if "params2" not in params:
                 params["params2"] = {}
             if "ip" not in params["params2"]:
@@ -197,7 +198,6 @@ class DCNetwork(Containernet):
                 node2_port_id = params["params2"]["id"]
         node2_port_name = link.intf2.name
 
-
         # add edge and assigned port number to graph in both directions between node1 and node2
         # port_id: id given in descriptor (if available, otherwise same as port)
         # port: portnumber assigned by Containernet
@@ -215,23 +215,22 @@ class DCNetwork(Containernet):
                 attr_number = None
             attr_dict[attr] = attr_number
 
-
         attr_dict2 = {'src_port_id': node1_port_id, 'src_port_nr': node1.ports[link.intf1],
                       'src_port_name': node1_port_name,
-                     'dst_port_id': node2_port_id, 'dst_port_nr': node2.ports[link.intf2],
+                      'dst_port_id': node2_port_id, 'dst_port_nr': node2.ports[link.intf2],
                       'dst_port_name': node2_port_name}
         attr_dict2.update(attr_dict)
         self.DCNetwork_graph.add_edge(node1.name, node2.name, attr_dict=attr_dict2)
 
         attr_dict2 = {'src_port_id': node2_port_id, 'src_port_nr': node2.ports[link.intf2],
                       'src_port_name': node2_port_name,
-                     'dst_port_id': node1_port_id, 'dst_port_nr': node1.ports[link.intf1],
+                      'dst_port_id': node1_port_id, 'dst_port_nr': node1.ports[link.intf1],
                       'dst_port_name': node1_port_name}
         attr_dict2.update(attr_dict)
         self.DCNetwork_graph.add_edge(node2.name, node1.name, attr_dict=attr_dict2)
 
         LOG.debug("addLink: n1={0} intf1={1} -- n2={2} intf2={3}".format(
-            str(node1),node1_port_name, str(node2), node2_port_name))
+            str(node1), node1_port_name, str(node2), node2_port_name))
 
         return link
 
@@ -249,20 +248,20 @@ class DCNetwork(Containernet):
         try:
             self.DCNetwork_graph.remove_edge(node2.name, node1.name)
         except:
-            LOG.warning("%s not found in DCNetwork_graph." % ((node2.name, node1.name)))
+            LOG.warning("%s, %s not found in DCNetwork_graph." % ((node2.name, node1.name)))
         try:
             self.DCNetwork_graph.remove_edge(node1.name, node2.name)
         except:
-            LOG.warning("%s not found in DCNetwork_graph." % ((node1.name, node2.name)))
+            LOG.warning("%s, %s not found in DCNetwork_graph." % ((node1.name, node2.name)))
 
-    def addDocker( self, label, **params ):
+    def addDocker(self, label, **params):
         """
         Wrapper for addDocker method to use custom container class.
         """
         self.DCNetwork_graph.add_node(label, type=params.get('type', 'docker'))
         return Containernet.addDocker(self, label, cls=EmulatorCompute, **params)
 
-    def removeDocker( self, label, **params):
+    def removeDocker(self, label, **params):
         """
         Wrapper for removeDocker method to update graph.
         """
@@ -274,7 +273,7 @@ class DCNetwork(Containernet):
         Wrapper for addExtSAP method to store SAP  also in graph.
         """
         # make sure that 'type' is set
-        params['type'] = params.get('type','sap_ext')
+        params['type'] = params.get('type', 'sap_ext')
         self.DCNetwork_graph.add_node(sap_name, type=params['type'])
         return Containernet.addExtSAP(self, sap_name, sap_ip, **params)
 
@@ -285,19 +284,19 @@ class DCNetwork(Containernet):
         self.DCNetwork_graph.remove_node(sap_name)
         return Containernet.removeExtSAP(self, sap_name)
 
-    def addSwitch( self, name, add_to_graph=True, **params ):
+    def addSwitch(self, name, add_to_graph=True, **params):
         """
         Wrapper for addSwitch method to store switch also in graph.
         """
 
         # add this switch to the global topology overview
         if add_to_graph:
-            self.DCNetwork_graph.add_node(name, type=params.get('type','switch'))
+            self.DCNetwork_graph.add_node(name, type=params.get('type', 'switch'))
 
         # set the learning switch behavior
-        if 'failMode' in params :
+        if 'failMode' in params:
             failMode = params['failMode']
-        else :
+        else:
             failMode = self.failMode
 
         s = Containernet.addSwitch(self, name, protocols='OpenFlow10,OpenFlow12,OpenFlow13', failMode=failMode, **params)
@@ -331,24 +330,28 @@ class DCNetwork(Containernet):
         # stop Ryu controller
         self.killRyu()
 
-
     def CLI(self):
         CLI(self)
 
-    def setLAN(self, vnf_list):
+    def setLAN(self, vnf_list, vlan=None, action='add'):
         """
         setup an E-LAN network by assigning the same VLAN tag to each DC interface of the VNFs in the E-LAN
 
         :param vnf_list: names of the VNFs in this E-LAN  [{name:,interface:},...]
+        :param vlan: vlan tag to be used
+        :param action: 'add' or 'delete' the vlan tags for the intefaces
+
         :return:
         """
         src_sw = None
         src_sw_inport_nr = 0
         src_sw_inport_name = None
 
-        # get a vlan tag for this E-LAN
-        vlan = self.vlans.pop()
+        if vlan is None:
+            # get a vlan tag for this E-LAN
+            vlan = self.vlans.pop()
 
+        ret = ''
         for vnf in vnf_list:
             vnf_src_name = vnf['name']
             vnf_src_interface = vnf['interface']
@@ -364,7 +367,7 @@ class DCNetwork(Containernet):
                 link_dict = self.DCNetwork_graph[vnf_src_name][connected_sw]
                 for link in link_dict:
                     if (link_dict[link]['src_port_id'] == vnf_src_interface or
-                                link_dict[link]['src_port_name'] == vnf_src_interface):  # Fix: we might also get interface names, e.g, from a son-emu-cli call
+                            link_dict[link]['src_port_name'] == vnf_src_interface):  # Fix: we might also get interface names, e.g, from a son-emu-cli call
                         # found the right link and connected switch
                         src_sw = connected_sw
                         src_sw_inport_nr = link_dict[link]['dst_port_nr']
@@ -372,12 +375,22 @@ class DCNetwork(Containernet):
                         break
 
             # set the tag on the dc switch interface
-            LOG.debug('set E-LAN: vnf name: {0} interface: {1} tag: {2}'.format(vnf_src_name, vnf_src_interface,vlan))
+            LOG.debug('set E-LAN: vnf name: {0} interface: {1} tag: {2}'.format(vnf_src_name, vnf_src_interface, vlan))
             switch_node = self.getNodeByName(src_sw)
-            self._set_vlan_tag(switch_node, src_sw_inport_name, vlan)
+            if action == 'add':
+                self._set_vlan_tag(switch_node, src_sw_inport_name, vlan, vnf_src_name, vnf_src_interface)
+            elif action == 'delete':
+                self._remove_vlan_tag(switch_node, src_sw_inport_name, vlan, vnf_src_name, vnf_src_interface)
+            else:
+                ret += "\nERROR: undefined action: {0}".format(action)
+                continue
+
+            ret += "\n{0} vlan tag: {1} on {2}:{3}".format(action, vlan, vnf_src_name, vnf_src_interface)
+
+        return ret
 
     def _addMonitorFlow(self, vnf_src_name, vnf_dst_name, vnf_src_interface=None, vnf_dst_interface=None,
-                       tag=None, **kwargs):
+                        tag=None, **kwargs):
         """
         Add a monitoring flow entry that adds a special flowentry/counter at the begin or end of a chain.
         So this monitoring flowrule exists on top of a previously defined chain rule and uses the same vlan tag/routing.
@@ -400,7 +413,7 @@ class DCNetwork(Containernet):
         LOG.debug("call AddMonitorFlow vnf_src_name=%r, vnf_src_interface=%r, vnf_dst_name=%r, vnf_dst_interface=%r",
                   vnf_src_name, vnf_src_interface, vnf_dst_name, vnf_dst_interface)
 
-        #check if port is specified (vnf:port)
+        # check if port is specified (vnf:port)
         if vnf_src_interface is None:
             # take first interface by default
             connected_sw = self.DCNetwork_graph.neighbors(vnf_src_name)[0]
@@ -460,14 +473,14 @@ class DCNetwork(Containernet):
 
         cmd = kwargs.get('cmd')
 
-        #iterate through the path to install the flow-entries
-        for i in range(0,len(path)):
+        # iterate through the path to install the flow-entries
+        for i in range(0, len(path)):
             current_node = self.getNodeByName(current_hop)
 
-            if path.index(current_hop) < len(path)-1:
-                next_hop = path[path.index(current_hop)+1]
+            if path.index(current_hop) < len(path) - 1:
+                next_hop = path[path.index(current_hop) + 1]
             else:
-                #last switch reached
+                # last switch reached
                 next_hop = vnf_dst_name
 
             next_node = self.getNodeByName(next_hop)
@@ -475,7 +488,7 @@ class DCNetwork(Containernet):
             if next_hop == vnf_dst_name:
                 switch_outport_nr = dst_sw_outport_nr
                 LOG.info("end node reached: {0}".format(vnf_dst_name))
-            elif not isinstance( next_node, OVSSwitch ):
+            elif not isinstance(next_node, OVSSwitch):
                 LOG.info("Next node: {0} is not a switch".format(next_hop))
                 return "Next node: {0} is not a switch".format(next_hop)
             else:
@@ -483,9 +496,8 @@ class DCNetwork(Containernet):
                 index_edge_out = 0
                 switch_outport_nr = self.DCNetwork_graph[current_hop][next_hop][index_edge_out]['src_port_nr']
 
-
            # set of entry via ovs-ofctl
-            if isinstance( current_node, OVSSwitch ):
+            if isinstance(current_node, OVSSwitch):
                 kwargs['vlan'] = tag
                 kwargs['path'] = path
                 kwargs['current_hop'] = current_hop
@@ -506,22 +518,21 @@ class DCNetwork(Containernet):
                     LOG.exception('invalid monitor command: {0}'.format(monitor_placement))
 
                 if self.controller == RemoteController and insert_flow:
-                    ## set flow entry via ryu rest api
+                    # set flow entry via ryu rest api
+                    #self._set_flow_entry_dpctl(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
                     self._set_flow_entry_ryu_rest(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
-                    # self._set_flow_entry_dpctl(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
                     break
                 elif insert_flow:
-                    ## set flow entry via ovs-ofctl
+                    # set flow entry via ovs-ofctl
                     self._set_flow_entry_dpctl(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
                     break
 
             # take first link between switches by default
-            if isinstance( next_node, OVSSwitch ):
+            if isinstance(next_node, OVSSwitch):
                 switch_inport_nr = self.DCNetwork_graph[current_hop][next_hop][0]['dst_port_nr']
                 current_hop = next_hop
 
         return "path {2} between {0} and {1}".format(vnf_src_name, vnf_dst_name, cmd)
-
 
     def setChain(self, vnf_src_name, vnf_dst_name, vnf_src_interface=None, vnf_dst_interface=None, **kwargs):
         """
@@ -541,46 +552,51 @@ class DCNetwork(Containernet):
         :param tag: vlan tag to be used for this chain (pre-defined or new one if none is specified)
         :param skip_vlan_tag: boolean to indicate if a vlan tag should be appointed to this flow or not
         :param path: custom path between the two VNFs (list of switches)
+        :param bidirectional: setup the chain in two directions or only one-way (src <-> dst)
         :return: output log string
         """
 
+        # check if chain already exists (by checking if a vlan tag has already been assigned for this interface)
+        id_src = "{0}:{1}".format(vnf_src_name, vnf_src_interface)
+        tag_src = self.vlan_dict.get(id_src)
+        id_dst = "{0}:{1}".format(vnf_dst_name, vnf_dst_interface)
+        tag_dst = self.vlan_dict.get(id_dst)
+        if (tag_src == tag_dst) and (tag_src is not None) and (tag_dst is not None):
+            kwargs['tag'] = tag_src
+
         # special procedure for monitoring flows
         if kwargs.get('monitor'):
-
-            # check if chain already exists
-            found_chains = [chain_dict for chain_dict in self.installed_chains if
-             (chain_dict['vnf_src_name'] == vnf_src_name and chain_dict['vnf_src_interface'] == vnf_src_interface
-             and chain_dict['vnf_dst_name'] == vnf_dst_name and chain_dict['vnf_dst_interface'] == vnf_dst_interface)]
-
-            if len(found_chains) > 0:
-                # this chain exists, so need an extra monitoring flow
+            tag = kwargs.get['tag']
+            if tag is not None:
+                # this chain exists (part of E-LAN or E-Line), so need an extra monitoring flow, reusing the existing vlan
                 # assume only 1 chain per vnf/interface pair
                 LOG.debug('*** installing monitoring chain on top of pre-defined chain from {0}:{1} -> {2}:{3}'.
-                            format(vnf_src_name, vnf_src_interface, vnf_dst_name, vnf_dst_interface))
-                tag = found_chains[0]['tag']
+                          format(vnf_src_name, vnf_src_interface, vnf_dst_name, vnf_dst_interface))
                 ret = self._addMonitorFlow(vnf_src_name, vnf_dst_name, vnf_src_interface, vnf_dst_interface,
-                                     tag=tag, table_id=0, **kwargs)
+                                           tag=tag, table_id=0, **kwargs)
                 return ret
             else:
-                # no chain existing (or E-LAN) -> install normal chain
-                LOG.warning('*** installing monitoring chain without pre-defined NSD chain from {0}:{1} -> {2}:{3}'.
+                # no chain existing (no common vlan tag) -> install normal chain
+                LOG.warning('*** installing monitoring chain without pre-defined NSD chain from {0}:{1} -> {2}:{3} '
+                            '(no matching vlan tags found, installing new chain)'.
                             format(vnf_src_name, vnf_src_interface, vnf_dst_name, vnf_dst_interface))
                 pass
 
-
-        cmd = kwargs.get('cmd')
+        cmd = kwargs.get('cmd', 'add-flow')
         if cmd == 'add-flow' or cmd == 'del-flows':
             ret = self._chainAddFlow(vnf_src_name, vnf_dst_name, vnf_src_interface, vnf_dst_interface, **kwargs)
-            if kwargs.get('bidirectional'):
+            # this can be a boolean or a string value, as returned by the rest api
+            bidirectional = kwargs.get('bidirectional')
+            true_list = ['true', 'True', True, 1]
+            if bidirectional in true_list:
                 if kwargs.get('path') is not None:
                     kwargs['path'] = list(reversed(kwargs.get('path')))
-                ret = ret +'\n' + self._chainAddFlow(vnf_dst_name, vnf_src_name, vnf_dst_interface, vnf_src_interface, **kwargs)
+                ret = ret + '\n' + self._chainAddFlow(vnf_dst_name, vnf_src_name, vnf_dst_interface, vnf_src_interface, **kwargs)
 
         else:
             ret = "Command unknown"
 
         return ret
-
 
     def _chainAddFlow(self, vnf_src_name, vnf_dst_name, vnf_src_interface=None, vnf_dst_interface=None, **kwargs):
 
@@ -594,7 +610,7 @@ class DCNetwork(Containernet):
         LOG.debug("call chainAddFlow vnf_src_name=%r, vnf_src_interface=%r, vnf_dst_name=%r, vnf_dst_interface=%r",
                   vnf_src_name, vnf_src_interface, vnf_dst_name, vnf_dst_interface)
 
-        #check if port is specified (vnf:port)
+        # check if port is specified (vnf:port)
         if vnf_src_interface is None:
             # take first interface by default
             connected_sw = self.DCNetwork_graph.neighbors(vnf_src_name)[0]
@@ -661,18 +677,8 @@ class DCNetwork(Containernet):
             else:
                 vlan = self.vlans.pop()
 
-        # store the used vlan tag to identify this chain
-        if not kwargs.get('monitor'):
-            chain_dict = {}
-            chain_dict['vnf_src_name'] = vnf_src_name
-            chain_dict['vnf_dst_name'] = vnf_dst_name
-            chain_dict['vnf_src_interface'] = vnf_src_interface
-            chain_dict['vnf_dst_interface'] = vnf_dst_interface
-            chain_dict['tag'] = vlan
-            self.installed_chains.append(chain_dict)
-
-        #iterate through the path to install the flow-entries
-        for i in range(0,len(path)):
+        # iterate through the path to install the flow-entries
+        for i in range(0, len(path)):
             current_node = self.getNodeByName(current_hop)
 
             if i < len(path) - 1:
@@ -682,54 +688,65 @@ class DCNetwork(Containernet):
                 next_hop = vnf_dst_name
 
             next_node = self.getNodeByName(next_hop)
-            end_node = False
+
             if next_hop == vnf_dst_name:
                 switch_outport_nr = dst_sw_outport_nr
-                if (("vpn" in vnf_dst_name and not("sink" in vnf_src_name)) or ("nat" in vnf_dst_name and not("source" in vnf_src_name))):
-                    end_node = True
                 LOG.info("end node reached: {0}".format(vnf_dst_name))
-            elif not isinstance( next_node, OVSSwitch ):
+            elif not isinstance(next_node, OVSSwitch):
                 LOG.info("Next node: {0} is not a switch".format(next_hop))
                 return "Next node: {0} is not a switch".format(next_hop)
             else:
                 # take first link between switches by default
                 index_edge_out = 0
                 switch_outport_nr = self.DCNetwork_graph[current_hop][next_hop][index_edge_out]['src_port_nr']
+            custom_path = 0
 
-
+            if (("nat" in vnf_dst_name and "fw" in vnf_src_name) or ("fw" in vnf_dst_name and "nat" in vnf_src_name)):
+                custom_path = 1
+            if ("ids" in vnf_src_name and "fw" in vnf_dst_name):
+                custom_path = 2
+            if ("ids" in vnf_src_name and "vpn" in vnf_dst_name):
+                custom_path = 3
            # set OpenFlow entry
-            if isinstance( current_node, OVSSwitch ):
+            if isinstance(current_node, OVSSwitch):
                 kwargs['vlan'] = vlan
                 kwargs['path'] = path
                 kwargs['current_hop'] = current_hop
                 kwargs['switch_inport_name'] = src_sw_inport_name
                 kwargs['switch_outport_name'] = dst_sw_outport_name
                 kwargs['pathindex'] = i
+                kwargs['vnf_src_name'] = vnf_src_name
+                kwargs['vnf_src_interface'] = vnf_src_interface
+                kwargs['vnf_dst_name'] = vnf_dst_name
+                kwargs['vnf_dst_interface'] = vnf_dst_interface
 
                 if self.controller == RemoteController:
-                    ## set flow entry via ryu rest api
+                    # set flow entry via ryu rest api
+                    #self._set_flow_entry_dpctl(current_node, switch_inport_nr, switch_outport_nr,  end_node, **kwargs)
                     self._set_flow_entry_ryu_rest(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
-                    # self._set_flow_entry_dpctl(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
                 else:
-                    ## set flow entry via ovs-ofctl
-                    self._set_flow_entry_dpctl(current_node, switch_inport_nr, switch_outport_nr, end_node, **kwargs)
+                    # set flow entry via ovs-ofctl
+                    self._set_flow_entry_dpctl(current_node, switch_inport_nr, switch_outport_nr, **kwargs)
+                    if (custom_path != 0):
+                        self._set_flow_entry_dpctl_netsolver(current_node, switch_inport_nr, switch_outport_nr, custom_path, **kwargs)
 
             # take first link between switches by default
-            if isinstance( next_node, OVSSwitch ):
+            if isinstance(next_node, OVSSwitch):
                 switch_inport_nr = self.DCNetwork_graph[current_hop][next_hop][0]['dst_port_nr']
                 current_hop = next_hop
 
         flow_options = {
-            'priority':kwargs.get('priority', DEFAULT_PRIORITY),
-            'cookie':kwargs.get('cookie', DEFAULT_COOKIE),
-            'vlan':kwargs['vlan'],
-            'path':kwargs['path'],
-            'match_input':kwargs.get('match')
+            'priority': kwargs.get('priority', DEFAULT_PRIORITY),
+            'cookie': kwargs.get('cookie', DEFAULT_COOKIE),
+            'vlan': kwargs['vlan'],
+            'path': kwargs['path'],
+            'match_input': kwargs.get('match')
         }
         flow_options_str = json.dumps(flow_options, indent=1)
         return "success: {2} between {0} and {1} with options: {3}".format(vnf_src_name, vnf_dst_name, cmd, flow_options_str)
 
     def _set_flow_entry_ryu_rest(self, node, switch_inport_nr, switch_outport_nr, **kwargs):
+
         match = 'in_port=%s' % switch_inport_nr
 
         cookie = kwargs.get('cookie')
@@ -769,10 +786,12 @@ class DCNetwork(Containernet):
             prefix = 'stats/flowentry/add'
             if vlan != None:
                 if index == 0:  # first node
-                    # set vlan tag in ovs instance (to isolate E-LANs)
+                    # set vlan tag in ovs instance (to isolate from E-LANs)
                     if not skip_vlan_tag:
                         in_port_name = kwargs.get('switch_inport_name')
-                        self._set_vlan_tag(node, in_port_name, vlan)
+                        vnf_src_name = kwargs.get('vnf_src_name')
+                        vnf_src_interface = kwargs.get('vnf_src_interface')
+                        self._set_vlan_tag(node, in_port_name, vlan, vnf_src_name, vnf_src_interface)
                     # set vlan push action if more than 1 switch in the path
                     if len(path) > 1:
                         action = {}
@@ -787,10 +806,12 @@ class DCNetwork(Containernet):
                         flow['actions'].append(action)
 
                 elif index == len(path) - 1:  # last node
-                    # set vlan tag in ovs instance (to isolate E-LANs)
+                    # set vlan tag in ovs instance (to isolate from E-LANs)
                     if not skip_vlan_tag:
                         out_port_name = kwargs.get('switch_outport_name')
-                        self._set_vlan_tag(node, out_port_name, vlan)
+                        vnf_dst_name = kwargs.get('vnf_dst_name')
+                        vnf_dst_interface = kwargs.get('vnf_dst_interface')
+                        self._set_vlan_tag(node, out_port_name, vlan, vnf_dst_name, vnf_dst_interface)
                     # set vlan pop action if more than 1 switch in the path
                     if len(path) > 1:
                         match += ',dl_vlan=%s' % vlan
@@ -820,14 +841,21 @@ class DCNetwork(Containernet):
             flow['actions'].append(action)
 
         flow['match'] = self._parse_match(match)
-        print(flow)
         self.ryu_REST(prefix, data=flow)
 
-    def _set_vlan_tag(self, node, switch_port, tag):
-        node.vsctl('set', 'port {0} tag={1}'.format(switch_port,tag))
+    def _set_vlan_tag(self, node, switch_port, tag, vnf_name, vnf_interface):
+        id = "{0}:{1}".format(vnf_name, vnf_interface)
+        self.vlan_dict[id] = tag
+        node.vsctl('set', 'port {0} tag={1}'.format(switch_port, tag))
         LOG.debug("set vlan in switch: {0} in_port: {1} vlan tag: {2}".format(node.name, switch_port, tag))
 
-    def _set_flow_entry_dpctl(self, node, switch_inport_nr, switch_outport_nr, end_node, **kwargs):
+    def _remove_vlan_tag(self, node, switch_port, tag, vnf_name, vnf_interface):
+        id = "{0}:{1}".format(vnf_name, vnf_interface)
+        self.vlan_dict.pop(id)
+        node.vsctl('remove', 'port {0} tag {1}'.format(switch_port, tag))
+        LOG.debug("unset vlan in switch: {0} in_port: {1} vlan tag: {2}".format(node.name, switch_port, tag))
+
+    def _set_flow_entry_dpctl(self, node, switch_inport_nr, switch_outport_nr, **kwargs):
 
         match = 'in_port=%s' % switch_inport_nr
         cookie = kwargs.get('cookie')
@@ -836,7 +864,6 @@ class DCNetwork(Containernet):
         path = kwargs.get('path')
         index = kwargs.get('pathindex')
         vlan = kwargs.get('vlan')
-
         s = ','
         if cookie:
             cookie = 'cookie=%s' % cookie
@@ -846,12 +873,7 @@ class DCNetwork(Containernet):
         if cmd == 'add-flow':
             action = 'action=%s' % switch_outport_nr
             if vlan != None:
-                if end_node:
-                #     # match += ',dl_vlan=%s' % vlan
-                #     action = 'action=strip_vlan,output=%s' % switch_outport_nr
-                     LOG.info("Detected NAT/VPN Node({3}) in switch: {0} in_port: {1} out_port: {2}".format(node.name, switch_inport_nr,
-                                                              switch_outport_nr, end_node))
-                if index == 0: # first node
+                if index == 0:  # first node
                     action = ('action=mod_vlan_vid:%s' % vlan) + (',output=%s' % switch_outport_nr)
                     match = '-O OpenFlow13 ' + match
                 elif index == len(path) - 1:  # last node
@@ -864,10 +886,53 @@ class DCNetwork(Containernet):
             ofcmd = match
         else:
             ofcmd = ''
-
+        LOG.info(cmd)
+        LOG.info(ofcmd)
         node.dpctl(cmd, ofcmd)
         LOG.info("{3} in switch: {0} in_port: {1} out_port: {2}".format(node.name, switch_inport_nr,
-                                                                                 switch_outport_nr, cmd))
+                                                                        switch_outport_nr, cmd))
+
+    def _set_flow_entry_dpctl_netsolver(self, node, switch_inport_nr, switch_outport_nr, custompath, **kwargs):
+
+        match = 'in_port=%s' % switch_inport_nr
+        match_input = kwargs.get('match')
+        cookie = kwargs.get('cookie')
+        cmd = kwargs.get('cmd')
+        vlan = kwargs.get('vlan')
+        s = ','
+        if vlan  is None or switch_outport_nr == 1:
+            return
+        if cookie:
+            cookie = 'cookie=%s' % cookie
+            match = s.join([cookie, match])
+        if match_input:
+            match = s.join([match, match_input])
+        if cmd == 'add-flow':
+            action = 'action=%s' % switch_outport_nr
+            if custompath == 1:
+                action = 'action=strip_vlan,output=%s' % switch_outport_nr
+                LOG.info("Detected NAT<->FW Path({3}) in switch: {0} in_port: {1} out_port: {2}".format(node.name,
+                                                                                                        switch_inport_nr, switch_outport_nr, custompath))
+            elif custompath == 2:
+                # match += ',dl_vlan=%s' % (vlan + 4)
+                action = 'action=strip_vlan,output=%s' % switch_outport_nr
+                LOG.info("Detected IDS->FW Path({3}) in switch: {0} in_port: {1} out_port: {2}".format(node.name,
+                                                                                                       switch_inport_nr, switch_outport_nr, custompath))
+            elif custompath == 3:
+                # match += ',dl_vlan=%s' % (vlan - 4)
+                action = 'action=strip_vlan,output=%s' % switch_outport_nr
+                LOG.info("Detected IDS->VPN Path({3}) in switch: {0} in_port: {1} out_port: {2}".format(node.name,
+                                                                                                        switch_inport_nr, switch_outport_nr, custompath))
+            ofcmd = s.join([match, action])
+        elif cmd == 'del-flows':
+            ofcmd = match
+        else:
+            ofcmd = ''
+        LOG.info(cmd)
+        LOG.info(ofcmd)
+        node.dpctl(cmd, ofcmd)
+        LOG.info("{3} in switch: {0} in_port: {1} out_port: {2}".format(node.name, switch_inport_nr,
+                                                                        switch_outport_nr, cmd))
 
     # start Ryu Openflow controller as Remote Controller for the DCNetwork
     def startRyu(self, learning_switch=True):
@@ -875,7 +940,7 @@ class DCNetwork(Containernet):
         python_install_path = site.getsitepackages()[0]
         # ryu default learning switch
         #ryu_path = python_install_path + '/ryu/app/simple_switch_13.py'
-        #custom learning switch that installs a default NORMAL action in the ovs switches
+        # custom learning switch that installs a default NORMAL action in the ovs switches
         dir_path = os.path.dirname(os.path.realpath(__file__))
         ryu_path = dir_path + '/son_emu_simple_switch_13.py'
         ryu_path2 = python_install_path + '/ryu/app/ofctl_rest.py'
@@ -918,7 +983,6 @@ class DCNetwork(Containernet):
         else:
             req = self.RyuSession.get(url)
 
-
         # do extra logging if status code is not 200 (OK)
         if req.status_code is not requests.codes.ok:
             logging.info(
@@ -926,9 +990,9 @@ class DCNetwork(Containernet):
                                                                                      req.encoding, req.text,
                                                                                      req.headers, req.history))
             LOG.info('url: {0}'.format(str(url)))
-            if data: LOG.info('POST: {0}'.format(str(data)))
+            if data:
+                LOG.info('POST: {0}'.format(str(data)))
             LOG.info('status: {0} reason: {1}'.format(req.status_code, req.reason))
-
 
         if 'json' in req.headers['content-type']:
             ret = req.json()
@@ -936,7 +1000,6 @@ class DCNetwork(Containernet):
 
         ret = req.text.rstrip()
         return ret
-
 
     # need to respect that some match fields must be integers
     # http://ryu.readthedocs.io/en/latest/app/ofctl_rest.html#description-of-match-and-actions
@@ -951,7 +1014,7 @@ class DCNetwork(Containernet):
                 except:
                     m2 = match[1]
 
-                dict.update({match[0]:m2})
+                dict.update({match[0]: m2})
         return dict
 
     def find_connected_dc_interface(self, vnf_src_name, vnf_src_interface=None):
