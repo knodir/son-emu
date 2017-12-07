@@ -346,22 +346,22 @@ def plumb_chains(net, vnfs, num_of_chains):
     vnf_index = 0
     for vnf_name_and_obj in vnfs['fw']:
         vnf_name = vnf_name_and_obj.keys()[0]
-        cmds.append('sudo docker exec mn.%s /root/start.sh %s &' %
+        cmds.append('sudo docker exec -d mn.%s /root/start.sh %s' %
                     (vnf_name, vnf_index))
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.10.0/24 dev output-ids"' % vnf_name)
+            'sudo docker exec mn.%s route add -net 10.0.10.0/24 dev output-ids' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "route del -net 10.0.1.0/24 dev output-ids"' % vnf_name)
+            'sudo docker exec mn.%s route del -net 10.0.1.0/24 dev output-ids' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "route del -net 10.0.1.0/24 dev input"' % vnf_name)
+            'sudo docker exec mn.%s route del -net 10.0.1.0/24 dev input' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.8.0.0/24 dev output-ids"' % vnf_name)
+            'sudo docker exec mn.%s route add -net 10.8.0.0/24 dev output-ids' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 dev input"' % vnf_name)
+            'sudo docker exec mn.%s route add -net 10.0.0.0/24 dev input' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.1.0/26 dev input"' % vnf_name)
+            'sudo docker exec mn.%s route add -net 10.0.1.0/26 dev input' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.1.0/24 dev output-ids"' % vnf_name)
+            'sudo docker exec mn.%s route add -net 10.0.1.0/24 dev output-ids' % vnf_name)
         vnf_index = vnf_index + 1
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -380,14 +380,14 @@ def plumb_chains(net, vnfs, num_of_chains):
     # and output interfaces to OVS bridge to enable packet forwarding.
     for vnf_name_and_obj in vnfs['nat']:
         vnf_name = vnf_name_and_obj.keys()[0]
-        cmd = 'sudo docker exec -i mn.%s /bin/bash /start.sh' % vnf_name
+        cmd = 'sudo docker exec mn.%s ./start.sh' % vnf_name
         execStatus = subprocess.call(cmd, shell=True)
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
     # execute /start.sh script inside ids image. It bridges input and output
     # interfaces with br0, and starts ids process listering on br0.
     for vnf_name_and_obj in vnfs['ids']:
         vnf_name = vnf_name_and_obj.keys()[0]
-        cmd = 'sudo docker exec -i mn.%s /bin/bash -c "sh /start.sh"' % vnf_name
+        cmd = 'sudo docker exec mn.%s sh ./start.sh' % vnf_name
         execStatus = subprocess.call(cmd, shell=True)
         glog.info('returned %d from %s (0 is success)', execStatus, cmd)
 
@@ -442,33 +442,33 @@ def plumb_chains(net, vnfs, num_of_chains):
     for vnf_name_and_obj in vnfs['sink']:
         vnf_name = vnf_name_and_obj.keys()[0]
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/8 dev intf2"' % vnf_name)
+            'sudo docker exec mn.%s route add -net 10.0.0.0/8 dev intf2' % vnf_name)
         # start openvpn server and related services inside openvpn server
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "ufw enable"' % vnf_name)
+            'sudo docker exec mn.%s ufw enable' % vnf_name)
         # open iperf3 port (5201) on firewall (ufw)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "ufw allow 5201"' % vnf_name)
+            'sudo docker exec mn.%s ufw allow 5201' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "ufw status"' % vnf_name)
+            'sudo docker exec mn.%s ufw status' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "service openvpn start"' % vnf_name)
+            'sudo docker exec mn.%s service openvpn start' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "service openvpn status"' % vnf_name)
+            'sudo docker exec mn.%s service openvpn status' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "service rsyslog start"' % vnf_name)
+            'sudo docker exec mn.%s service rsyslog start' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "service rsyslog status"' % vnf_name)
+            'sudo docker exec mn.%s service rsyslog status' % vnf_name)
 
     for vnf_name_and_obj in vnfs['vpn']:
         vnf_name = vnf_name_and_obj.keys()[0]
         # execute /start.sh script inside VPN client to connect to VPN server.
         cmds.append(
-           'sudo docker exec -i mn.%s /bin/bash /start.sh &' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "echo 1 > /proc/sys/net/ipv4/ip_forward"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "echo 1 > /proc/sys/net/ipv4/conf/all/proxy_arp"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 input-ids"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "sleep 5 && route del 10.0.10.10"' % vnf_name)
+            'sudo docker exec mn.%s /bin/bash /start.sh &' % vnf_name)
+        #cmds.append('sudo docker exec mn.%s /echo 1 > /proc/sys/net/ipv4/ip_forward"' % vnf_name)
+        #cmds.append('sudo docker exec mn.%s echo 1 > /proc/sys/net/ipv4/conf/all/proxy_arp"' % vnf_name)
+        cmds.append('sudo docker exec mn.%s route add -net 10.0.0.0/24 input-ids' % vnf_name)
+        cmds.append('sudo docker exec mn.%s /bin/bash -c "sleep 5 && route del 10.0.10.10"' % vnf_name)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -484,19 +484,19 @@ def plumb_chains(net, vnfs, num_of_chains):
         vnf_name = vnf_name_and_obj.keys()[0]
         # rewrite NAT VNF MAC addresses for tcpreplay
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "ifconfig input hw ether 00:00:00:00:00:02"' % vnf_name)
+            'sudo docker exec mn.%s ifconfig input hw ether 00:00:00:00:00:02' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.10.0/24 dev output"' % vnf_name)
+            'sudo docker exec mn.%s route add -net 10.0.10.0/24 dev output' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "ip route add 10.8.0.0/24 dev output"' % vnf_name)
+            'sudo docker exec mn.%s ip route add 10.8.0.0/24 dev output' % vnf_name)
 
     # for vnf_name_and_obj in vnfs['vpn']:
     #     vnf_name = vnf_name_and_obj.keys()[0]
     #     # cmds.append(
-    #     #    'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 dev input-ids"' % vnf_name)
+    #     #    'sudo docker exec mn.%s route add -net 10.0.0.0/24 dev input-ids"' % vnf_name)
     #     # cmds.append(
-    #     #    'sudo docker exec -i mn.%s /bin/bash -c "ip route del 10.0.10.10/32"' % vnf_name)
-    #     # cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route del -net 10.0.1.0/24 input-ids"' % vnf_name)
+    #     #    'sudo docker exec mn.%s ip route del 10.0.10.10/32"' % vnf_name)
+    #     # cmds.append('sudo docker exec mn.%s route del -net 10.0.1.0/24 input-ids"' % vnf_name)
     #     cmds.append('route add -net 10.0.0.0/8 input-ids')
     #     cmds.append('route add -net 10.0.0.0/8 input-ids')
 
@@ -504,16 +504,16 @@ def plumb_chains(net, vnfs, num_of_chains):
         vnf_name = vnf_name_and_obj.keys()[0]
         # rewrite client VNF MAC addresses for tcpreplay
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "ifconfig intf1 hw ether 00:00:00:00:00:01"' % vnf_name)
+            'sudo docker exec mn.%s ifconfig intf1 hw ether 00:00:00:00:00:01' % vnf_name)
         # manually chain routing table entries on VNFs
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/16 dev intf1"' % vnf_name)
+            'sudo docker exec mn.%s route add -net 10.0.0.0/16 dev intf1' % vnf_name)
         cmds.append(
-            'sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.8.0.0/24 dev intf1"' % vnf_name)
+            'sudo docker exec mn.%s route add -net 10.8.0.0/24 dev intf1' % vnf_name)
         # cmds.append(
-        #     'sudo docker exec -i mn.%s /bin/bash -c "ping -i 0.1 -c 10 10.0.10.10"' % vnf_name)
+        #     'sudo docker exec mn.%s ping -i 0.1 -c 10 10.0.10.10"' % vnf_name)
         # cmds.append(
-        #     'sudo docker exec -i mn.%s /bin/bash -c "ping -i 0.1 -c 10 10.8.0.1"' % vnf_name)
+        #     'sudo docker exec mn.%s ping -i 0.1 -c 10 10.8.0.1"' % vnf_name)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -539,15 +539,15 @@ def benchmark(algo, line, mbps):
     cmds = []
     num_of_chains = int(line)
 
-    # kill existing tcpreplay and dstat, and copy traces to the source VNF
+    # # kill existing tcpreplay and dstat, and copy traces to the source VNF
     for chain_index in range(num_of_chains):
-        cmds.append(
-            'sudo docker exec -i mn.chain%d-source /bin/bash -c "pkill tcpreplay"' % chain_index)
-        cmds.append(
-            'sudo docker exec -i mn.chain%d-sink /bin/bash -c "pkill python2"' % chain_index)
-        # remove stale dstat output file (if any)
-        cmds.append(
-            'sudo docker exec -i mn.chain%d-sink /bin/bash -c "rm /tmp/dstat.csv"' % chain_index)
+        #     cmds.append(
+        #         'sudo docker exec mn.chain%d-source pkill tcpreplay"' % chain_index)
+        #     cmds.append(
+        #         'sudo docker exec mn.chain%d-sink pkill python2"' % chain_index)
+        #     # remove stale dstat output file (if any)
+        #     cmds.append(
+        #         'sudo docker exec mn.chain%d-sink rm /tmp/dstat.csv"' % chain_index)
         cmds.append(
             'sudo docker cp ../traces/output2.pcap mn.chain%d-source:/' % chain_index)
 
@@ -561,8 +561,8 @@ def benchmark(algo, line, mbps):
 
     for chain_index in range(num_of_chains):
         cmds.append(
-            'sudo docker exec -i mn.chain%d-sink /bin/bash -c "dstat --net --time -N intf2 --bits --output /tmp/dstat.csv" &' % chain_index)
-        # cmds.append('sudo docker exec -i mn.chain%d-sink /bin/bash -c "iperf3 -s" &' % chain_index)
+            'sudo docker exec -d mn.chain%d-sink dstat --net --time -N intf2 --bits --output /tmp/dstat.csv' % chain_index)
+        #cmds.append('sudo docker exec mn.chain%d-sink iperf3 -s &' % chain_index)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -575,8 +575,8 @@ def benchmark(algo, line, mbps):
 
     for chain_index in range(num_of_chains):
         # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
-        cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 output2.pcap" &' % (chain_index, mbps))
-        # cmds.append('sudo docker exec -i mn.chain%d-source /bin/bash -c "iperf3 --verbose --zerocopy  -b %dm -c 10.0.10.10 -t 86400" &' % (chain_index, mbps))
+        cmds.append('sudo docker exec -d mn.chain%d-source tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 output2.pcap' % (chain_index, mbps))
+        # cmds.append('sudo docker exec -d mn.chain%d-source iperf3 --zerocopy  -b %dm -c 10.0.10.10 -t 86400' % (chain_index, mbps))
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -591,13 +591,9 @@ def benchmark(algo, line, mbps):
     # kill existing tcpreplay and dstat
     for chain_index in range(num_of_chains):
         cmds.append(
-            'sudo docker exec -i mn.chain%d-source /bin/bash -c "pkill tcpreplay"' % chain_index)
+            'sudo docker exec mn.chain%d-source pkill tcpreplay' % chain_index)
         cmds.append(
-            'sudo docker exec -i mn.chain%d-sink /bin/bash -c "pkill python2"' % chain_index)
-        cmds.append(
-            'sudo docker exec -i mn.chain%d-source /bin/bash -c "killall iperf3"' % chain_index)
-        cmds.append(
-            'sudo docker exec -i mn.chain%d-sink /bin/bash -c "killall iperf3"' % chain_index)
+            'sudo docker exec mn.chain%d-sink pkill python2' % chain_index)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -624,7 +620,7 @@ def benchmark(algo, line, mbps):
     # remove dstat output files
     for chain_index in range(num_of_chains):
         cmds.append(
-            'sudo docker exec -i mn.chain%d-sink /bin/bash -c "rm /tmp/dstat.csv"' % chain_index)
+            'sudo docker exec mn.chain%d-sink rm /tmp/dstat.csv' % chain_index)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -701,7 +697,7 @@ if __name__ == '__main__':
                 if alloc.startswith('allocation'):
                     num_of_chains += 1
             glog.info('allocs: %s; num_of_chains = %d', allocs, num_of_chains)
-            #num_of_chains = 1
+            num_of_chains = 1
             # sys.exit(0)
             # allocate chains by placing them on appropriate servers
             vnfs = allocate_chains(dcs, allocs, num_of_chains)
