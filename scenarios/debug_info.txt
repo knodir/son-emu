@@ -1,0 +1,86 @@
+D1206 02:49:39.927846 20146 net.py:235] addLink: n1=chain0-source intf1=intf1 -- n2=dc17.s1 intf2=dc17.s1-eth2
+
+D1206 02:49:35.604038 20146 net.py:235] addLink: n1=chain0-fw intf1=input -- n2=dc24.s1 intf2=dc24.s1-eth2
+D1206 02:49:35.730851 20146 net.py:235] addLink: n1=chain0-fw intf1=output-ids -- n2=dc24.s1 intf2=dc24.s1-eth3
+D1206 02:49:35.847583 20146 net.py:235] addLink: n1=chain0-fw intf1=output-vpn -- n2=dc24.s1 intf2=dc24.s1-eth4
+
+D1206 02:49:37.766185 20146 net.py:235] addLink: n1=chain0-nat intf1=input -- n2=dc24.s1 intf2=dc24.s1-eth7
+D1206 02:49:37.883029 20146 net.py:235] addLink: n1=chain0-nat intf1=output -- n2=dc24.s1 intf2=dc24.s1-eth8
+
+D1206 02:49:36.752949 20146 net.py:235] addLink: n1=chain0-ids intf1=input -- n2=dc24.s1 intf2=dc24.s1-eth5
+D1206 02:49:36.872136 20146 net.py:235] addLink: n1=chain0-ids intf1=output -- n2=dc24.s1 intf2=dc24.s1-eth6
+
+D1206 02:49:38.803065 20146 net.py:235] addLink: n1=chain0-vpn intf1=input-ids -- n2=dc24.s1 intf2=dc24.s1-eth9
+D1206 02:49:38.912982 20146 net.py:235] addLink: n1=chain0-vpn intf1=input-fw -- n2=dc24.s1 intf2=dc24.s1-eth10
+D1206 02:49:39.021918 20146 net.py:235] addLink: n1=chain0-vpn intf1=output -- n2=dc24.s1 intf2=dc24.s1-eth11
+
+D1206 02:49:40.807362 20146 net.py:235] addLink: n1=chain0-sink intf1=intf2 -- n2=dc22.s1 intf2=dc22.s1-eth2
+
+echo 1 > /proc/sys/net/ipv4/ip_forward
+echo 1 > /proc/sys/net/ipv4/conf/all/proxy_arp
+
+IDS->VPN
+#sudo ovs-ofctl del-flows dc24.s1 in_port=6
+#sudo ovs-ofctl add-flow dc24.s1 in_port=6,action=mod_vlan_vid=7,output=9
+sudo ovs-ofctl add-flow dc24.s1 in_port=6,dl_vlan=5,action=strip_vlan,output=9
+
+IDS->FW
+#sudo ovs-ofctl del-flows dc24.s1 in_port=5
+#sudo ovs-ofctl add-flow dc24.s1 in_port=5,action=mod_vlan_vid=6,output=3
+sudo ovs-ofctl add-flow dc24.s1 in_port=5,dl_vlan=10,action=strip_vlan,output=3
+
+
+NAT->FW
+sudo ovs-ofctl add-flow dc24.s1 in_port=8,action=strip_vlan,output=2
+
+FW->NAT
+#sudo ovs-ofctl del-flows dc24.s1 in_port=2
+#sudo ovs-ofctl add-flow dc24.s1 in_port=2,action=mod_vlan_vid=4,output=8
+sudo ovs-ofctl add-flow dc24.s1 in_port=2,action=strip_vlan,output=8
+
+
+#sudo ovs-ofctl add-flow dc24.s1 in_port=1,dl_vlan=1,action=strip_vlan,output=7
+
+
+# Automated
+ cookie=0x0, duration=131.883s, table=0, n_packets=0, n_bytes=0, idle_age=131, in_port=5,dl_vlan=10 actions=strip_vlan,output:3
+ cookie=0x0, duration=131.856s, table=0, n_packets=0, n_bytes=0, idle_age=131, in_port=6,dl_vlan=7 actions=strip_vlan,output:9
+ cookie=0x0, duration=33.029s, table=0, n_packets=23, n_bytes=2086, idle_age=8, in_port=8 actions=strip_vlan,output:2
+ cookie=0x0, duration=33.008s, table=0, n_packets=15, n_bytes=1638, idle_age=5, in_port=2 actions=strip_vlan,output:8
+
+ cookie=0x0, duration=33.071s, table=0, n_packets=23, n_bytes=2178, idle_age=8, in_port=1,dl_vlan=1 actions=strip_vlan,output:7
+ cookie=0x0, duration=32.897s, table=0, n_packets=0, n_bytes=0, idle_age=32, in_port=1,dl_vlan=12 actions=strip_vlan,output:11
+
+ cookie=0x0, duration=33.062s, table=0, n_packets=15, n_bytes=1638, idle_age=5, in_port=7 actions=mod_vlan_vid:2,output:1
+ cookie=0x0, duration=32.994s, table=0, n_packets=6, n_bytes=252, idle_age=6, in_port=3 actions=mod_vlan_vid:5,output:5
+ cookie=0x0, duration=32.987s, table=0, n_packets=55, n_bytes=3850, idle_age=0, in_port=5 actions=mod_vlan_vid:6,output:3
+ cookie=0x0, duration=32.971s, table=0, n_packets=0, n_bytes=0, idle_age=32, in_port=4 actions=mod_vlan_vid:7,output:10
+ cookie=0x0, duration=32.964s, table=0, n_packets=0, n_bytes=0, idle_age=32, in_port=10 actions=mod_vlan_vid:8,output:4
+ cookie=0x0, duration=32.957s, table=0, n_packets=61, n_bytes=4126, idle_age=0, in_port=6 actions=mod_vlan_vid:9,output:9
+ cookie=0x0, duration=32.942s, table=0, n_packets=0, n_bytes=0, idle_age=32, in_port=9 actions=mod_vlan_vid:10,output:6
+ cookie=0x0, duration=32.935s, table=0, n_packets=0, n_bytes=0, idle_age=32, in_port=11 actions=mod_vlan_vid:11,output:1
+
+
+
+# Ideal
+
+ cookie=0x0, duration=38.355s, table=0, n_packets=43, n_bytes=4218, idle_age=0, in_port=5,dl_vlan=10 actions=strip_vlan,output:3
+ cookie=0x0, duration=316.834s, table=0, n_packets=245, n_bytes=13510, idle_age=0, in_port=6,dl_vlan=5 actions=strip_vlan,output:9
+ cookie=0x0, duration=311.578s, table=0, n_packets=326, n_bytes=30940, idle_age=0, in_port=8 actions=strip_vlan,output:2
+ cookie=0x0, duration=309.369s, table=0, n_packets=325, n_bytes=38402, idle_age=0, in_port=2 actions=strip_vlan,output:8
+
+ cookie=0x0, duration=394.455s, table=0, n_packets=383, n_bytes=37834, idle_age=0, in_port=1,dl_vlan=1 actions=strip_vlan,output:7
+ cookie=0x0, duration=394.329s, table=0, n_packets=45, n_bytes=4310, idle_age=0, in_port=1,dl_vlan=12 actions=strip_vlan,output:11
+
+
+ cookie=0x0, duration=394.447s, table=0, n_packets=383, n_bytes=45290, idle_age=0, in_port=7 actions=mod_vlan_vid:2,output:1
+ cookie=0x0, duration=394.407s, table=0, n_packets=245, n_bytes=12530, idle_age=0, in_port=3 actions=mod_vlan_vid:5,output:5
+ cookie=0x0, duration=394.400s, table=0, n_packets=407, n_bytes=23642, idle_age=39, in_port=5 actions=mod_vlan_vid:6,output:3
+ cookie=0x0, duration=394.392s, table=0, n_packets=0, n_bytes=0, idle_age=394, in_port=4 actions=mod_vlan_vid:7,output:10
+ cookie=0x0, duration=394.385s, table=0, n_packets=0, n_bytes=0, idle_age=394, in_port=10 actions=mod_vlan_vid:8,output:4
+ cookie=0x0, duration=394.378s, table=0, n_packets=205, n_bytes=14350, idle_age=109, in_port=6 actions=mod_vlan_vid:9,output:9
+ cookie=0x0, duration=394.371s, table=0, n_packets=245, n_bytes=12530, idle_age=0, in_port=9 actions=mod_vlan_vid:10,output:6
+ cookie=0x0, duration=394.364s, table=0, n_packets=42, n_bytes=4004, idle_age=0, in_port=11 actions=mod_vlan_vid:11,output:1
+
+
+

@@ -468,7 +468,7 @@ def plumb_chains(net, vnfs, num_of_chains):
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "echo 1 > /proc/sys/net/ipv4/ip_forward"' % vnf_name)
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "echo 1 > /proc/sys/net/ipv4/conf/all/proxy_arp"' % vnf_name)
         cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route add -net 10.0.0.0/24 input-ids"' % vnf_name)
-        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "route del 10.0.10.10"' % vnf_name)
+        cmds.append('sudo docker exec -i mn.%s /bin/bash -c "sleep 5 && route del 10.0.10.10"' % vnf_name)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -701,7 +701,7 @@ if __name__ == '__main__':
                 if alloc.startswith('allocation'):
                     num_of_chains += 1
             glog.info('allocs: %s; num_of_chains = %d', allocs, num_of_chains)
-            num_of_chains = 1
+            #num_of_chains = 1
             # sys.exit(0)
             # allocate chains by placing them on appropriate servers
             vnfs = allocate_chains(dcs, allocs, num_of_chains)
