@@ -1,0 +1,15 @@
+If docker commands or allocation fail keep this fault in mind and try to adjust the amount of available processes and file descriptors.
+       EAGAIN A system-imposed limit on the number of threads was
+              encountered.  There are a number of limits that may trigger
+              this error: the RLIMIT_NPROC soft resource limit (set via
+              setrlimit(2)), which limits the number of processes and
+              threads for a real user ID, was reached; the kernel's system-
+              wide limit on the number of processes and threads,
+              /proc/sys/kernel/threads-max, was reached (see proc(5)); or
+              the maximum number of PIDs, /proc/sys/kernel/pid_max, was
+              reached (see proc(5)).
+
+At the same time, the amount of "docker exec" commands should be limited. Killing certain processes might also help substantially in fixing the problem:
+For example:
+sudo pkill -f "bash --norc -is mininet
+After setting up all the infrastructure and before running benchmarks.

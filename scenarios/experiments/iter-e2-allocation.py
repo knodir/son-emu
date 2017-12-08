@@ -585,8 +585,9 @@ def finish_benchmarks(num_of_chains, algo, mbps):
     print('>>> wait 10s for dstats to terminate')
     time.sleep(10)
     print('<<< wait complete.')
-    cmds.append('mkdir ./results/iter-allocation/%s%s' %
-                (algo, str(mbps)))
+    dir = 'results/iter-allocation/%s%s' % (algo, str(mbps))
+    if not os.path.exists(dir):
+        os.makedirs(dir)
     # copy .csv results from VNF to the host
     for chain_index in range(num_of_chains):
         cmds.append('sudo docker cp mn.chain%s-sink:/tmp/dstat.csv ./results/iter-allocation/%s%s/e2-allocate-from-chain%s-sink.csv' %
@@ -700,7 +701,6 @@ if __name__ == '__main__':
             print('<<< wait complete.')
             print('Cleaning up benchmarking information')
             finish_benchmarks(num_of_chains, algo, mbps)
-            net.CLI()
             net.stop()
 
             cleanup()

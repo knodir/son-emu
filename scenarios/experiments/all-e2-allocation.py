@@ -18,6 +18,18 @@ from mininet.node import DefaultController
 from optparse import OptionParser
 
 
+def executeCmds(cmds):
+
+    if isinstance(cmds, basestring):
+        execStatus = subprocess.call(cmds, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmds))
+    else:
+        for cmd in cmds:
+            execStatus = subprocess.call(cmd, shell=True)
+            print('returned %d from %s (0 is success)' % (execStatus, cmd))
+    return execStatus
+
+
 def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
     """ Prepares physical topology to place chains. """
 
@@ -156,18 +168,6 @@ def get_placement(pn_fname, vn_fname, algo):
         cmd = "export PYTHONHASHSEED=1 && python3 %s %s %s --output %s %s" % (
             "../../../monosat_datacenter/src/netsolver_nfv.py", pn_fname,
             vn_fname, out_fname, '--max-resource 4')
-        execStatus = subprocess.call(cmd, shell=True)
-        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
-
-        if execStatus == 1:
-            glog.info("allocation failed")
-            return execStatus
-
-        glog.info("allocation succeeded")
-        # Read physical topology from file.
-        with open(out_fname) as data_file:
-            allocs = json.load(data_file)
-        return allocs
     elif algo == 'packing':
         glog.info('using packing for chain allocation')
 
@@ -175,19 +175,6 @@ def get_placement(pn_fname, vn_fname, algo):
         cmd = "export PYTHONHASHSEED=1 && python3 %s %s %s %s %s %s" % (
             "../../../monosat_datacenter/src/simple_nfv.py", pn_fname,
             vn_fname, "--output", out_fname, "--locality")
-        execStatus = subprocess.call(cmd, shell=True)
-        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
-
-        if execStatus == 1:
-            glog.info("allocation failed")
-            return execStatus
-
-        glog.info("allocation succeeded")
-        # Read physical topology from file.
-        with open(out_fname) as data_file:
-            allocs = json.load(data_file)
-        return allocs
-
     elif algo == 'random':
         glog.info('using random for chain allocation')
 
@@ -195,22 +182,20 @@ def get_placement(pn_fname, vn_fname, algo):
         cmd = "export PYTHONHASHSEED=1 && python3 %s %s %s %s %s %s" % (
             "../../../monosat_datacenter/src/simple_nfv.py", pn_fname,
             vn_fname, "--output", out_fname, "--random")
-        execStatus = subprocess.call(cmd, shell=True)
-        glog.info('returned %d from %s (0 is success)', execStatus, cmd)
-
-        if execStatus == 1:
-            glog.info("allocation failed")
-            return execStatus
-
-        glog.info("allocation succeeded")
-        # Read physical topology from file.
-        with open(out_fname) as data_file:
-            allocs = json.load(data_file)
-        return allocs
-
     else:
         glog.error('ERROR: unsupported allocation algorithm: %s' % algo)
         sys.exit(1)
+
+    execStatus = executeCmds(cmd)
+    if execStatus == 1:
+        glog.info("allocation failed")
+        return execStatus
+    glog.info("allocation succeeded")
+
+    # Read physical topology from file.
+    with open(out_fname) as data_file:
+        allocs = json.load(data_file)
+    return allocs
 
     # "allocs" has the following format
     # {'allocation_0':
@@ -227,7 +212,6 @@ def get_placement(pn_fname, vn_fname, algo):
 def allocate_chains(dcs, allocs, num_of_chains):
     """ Create chains by assigning VNF to their respective server. """
 
-    fl = "large"
     chain_index = 0
     # vnfs holds array of each VNF type
     vnfs = {'source': [], 'nat': [], 'fw': [],
@@ -537,21 +521,9 @@ def benchmark(algo, line, mbps):
     cmds = []
     num_of_chains = int(line)
 
-    # # kill existing tcpreplay and dstat, and copy traces to the source VNF
-    # glog.info('Cleaning up existing debris...')
-    # for chain_index in range(num_of_chains):
-    #     cmds.append(
-    #         'sudo docker exec mn.chain%d-source pkill tcpreplay"' % chain_index)
-    #     cmds.append(
-    #         'sudo docker exec mn.chain%d-sink pkill python2"' % chain_index)
-    #     # remove stale dstat output file (if any)
-    #     cmds.append(
-    #         'sudo docker exec mn.chain%d-sink rm /tmp/dstat.csv"' % chain_index)
-    cmds.append('sudo rm -f ./results/allocation/%s%s/*.csv' %
-                (algo, str(mbps)))
-    for cmd in cmds:
-        execStatus = subprocess.call(cmd, shell=True)
-        print('returned %d from %s (0 is success)' % (execStatus, cmd))
+    cmds.append('sudo rm -f ./results/allocation/%s%s/*.csv' % (algo, str(mbps)))
+
+    executeCmds(cmds)
     cmds[:] = []
 
     # # copy the traces into the containers for tcpreplay, this might take a while
@@ -565,15 +537,12 @@ def benchmark(algo, line, mbps):
     cmds[:] = []
 
     for chain_index in range(num_of_chains):
-        cmds.append(
-            'sudo docker exec -d mn.chain%d-sink dstat --net --time -N intf2 --bits --output /tmp/dstat.csv' % chain_index)
+        cmds.append('sudo docker exec -d mn.chain%d-sink dstat --net --time -N intf2 --bits --output /tmp/dstat.csv' % chain_index)
         # cmds.append('sudo docker exec mn.chain%d-sink iperf3 -s &' % chain_index)
 
-    for cmd in cmds:
-        execStatus = subprocess.call(cmd, shell=True)
-        print('returned %d from %s (0 is success)' % (execStatus, cmd))
-
+    executeCmds(cmds)
     cmds[:] = []
+
     print('>>> wait 10s for dstats to initialize')
     time.sleep(10)
     print('<<< wait complete.')
@@ -584,13 +553,10 @@ def benchmark(algo, line, mbps):
                     % (chain_index, mbps))
         # cmds.append('sudo docker exec -d mn.chain%d-source iperf3 --zerocopy  -b %dm -c 10.0.10.10 -t 86400' % (chain_index, mbps))
 
-    for cmd in cmds:
-        execStatus = subprocess.call(cmd, shell=True)
-        print('returned %d from %s (0 is success)' % (execStatus, cmd))
-
+    executeCmds(cmds)
     cmds[:] = []
 
-    print('>>> wait 60s to complete the experiment')
+    print('>>> wait 180s to complete the experiment')
     time.sleep(180)
     print('<<< wait complete.')
 
@@ -601,10 +567,7 @@ def benchmark(algo, line, mbps):
         cmds.append(
             'sudo docker exec mn.chain%d-sink pkill python2' % chain_index)
 
-    for cmd in cmds:
-        execStatus = subprocess.call(cmd, shell=True)
-        print('returned %d from %s (0 is success)' % (execStatus, cmd))
-
+    executeCmds(cmds)
     cmds[:] = []
 
     print('>>> wait 10s for dstats to terminate')
@@ -617,20 +580,13 @@ def benchmark(algo, line, mbps):
         cmds.append('sudo docker cp mn.chain%s-sink:/tmp/dstat.csv ./results/allocation/%s%s/e2-allocate-from-chain%s-sink.csv' %
                     (str(chain_index), algo, str(mbps), str(chain_index)))
 
-    for cmd in cmds:
-        execStatus = subprocess.call(cmd, shell=True)
-        print('returned %d from %s (0 is success)' % (execStatus, cmd))
-
+    executeCmds(cmds)
     cmds[:] = []
 
     # remove dstat output files
     for chain_index in range(num_of_chains):
         cmds.append(
             'sudo docker exec mn.chain%d-sink rm /tmp/dstat.csv' % chain_index)
-
-    for cmd in cmds:
-        execStatus = subprocess.call(cmd, shell=True)
-        print('returned %d from %s (0 is success)' % (execStatus, cmd))
 
     print('done')
 
@@ -646,12 +602,10 @@ if __name__ == '__main__':
     topology = options.topology
 
     # net, api, dcs, tors = prepareDC(pn_fname, 8, 3584, 64, 28672)
-
     # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-azure-1rack-24servers
     # pn_fname = "../topologies/e2-azure-1rack-24servers.pn.json"
     # net, api, dcs, tors = prepareDC(pn_fname, 20, 17408, 1200, 417792)
-
     # vn_fname = "../topologies/e2-chain-4vnfs-8wa.vn.json"
     # e2-azure-1rack-48servers (or 50 servers)
     # pn_fname = "../topologies/e2-azure-1rack-48servers.pn.json"
@@ -705,8 +659,7 @@ if __name__ == '__main__':
                 if alloc.startswith('allocation'):
                     num_of_chains += 1
             glog.info('allocs: %s; num_of_chains = %d', allocs, num_of_chains)
-            # num_of_chains = 1
-            # sys.exit(0)
+            num_of_chains = 1
             # allocate chains by placing them on appropriate servers
             vnfs = allocate_chains(dcs, allocs, num_of_chains)
             # configure the datapath on chains to push packets through them
@@ -717,7 +670,7 @@ if __name__ == '__main__':
             algo = algo + str(compute) + "_"
             glog.info('Sleeping 30 seconds before benchmarking')
             os.system('sudo pkill -f "bash --norc -is mininet"')
-            time.sleep(30)
+            # time.sleep(30)
             benchmark(algo=algo, line=num_of_chains, mbps=mbps)
             net.stop()
             cleanup()
