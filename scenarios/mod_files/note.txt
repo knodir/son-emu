@@ -13,3 +13,8 @@ At the same time, the amount of "docker exec" commands should be limited. Killin
 For example:
 sudo pkill -f "bash --norc -is mininet
 After setting up all the infrastructure and before running benchmarks.
+
+
+https://glassonionblog.wordpress.com/2013/01/27/increase-ulimit-and-file-descriptors-limit/
+http://man7.org/linux/man-pages/man3/pthread_create.3.html
+https://unix.stackexchange.com/questions/253903/creating-threads-fails-with-resource-temporarily-unavailable-with-4-3-kernel
