@@ -7,7 +7,6 @@ import json
 import os
 import glog
 import inspect
-sys.path.append('../../src/')
 from emuvim.dcemulator.net import DCNetwork
 from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
 from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM
@@ -322,7 +321,6 @@ def allocate_chains(dcs, allocs, num_of_chains):
                                                         network=[{'id': 'intf2', 'ip': '10.0.10.10/24'}])
                 vnfs[vnf_name].append({vnf_id: vnf_obj})
                 # os.system("sudo docker update --cpus 64 --cpuset-cpus 0-63 " + vnf_id)
-
             else:
                 glog.error('ERROR: unknown VNF type: %s', vnf_name)
                 sys.exit(1)
@@ -465,8 +463,8 @@ def plumb_chains(net, vnfs, num_of_chains):
         # execute /start.sh script inside VPN client to connect to VPN server.
         cmds.append(
             'sudo docker exec mn.%s /bin/bash /start.sh &' % vnf_name)
-        #cmds.append('sudo docker exec mn.%s /echo 1 > /proc/sys/net/ipv4/ip_forward"' % vnf_name)
-        #cmds.append('sudo docker exec mn.%s echo 1 > /proc/sys/net/ipv4/conf/all/proxy_arp"' % vnf_name)
+        # cmds.append('sudo docker exec mn.%s /echo 1 > /proc/sys/net/ipv4/ip_forward"' % vnf_name)
+        # cmds.append('sudo docker exec mn.%s echo 1 > /proc/sys/net/ipv4/conf/all/proxy_arp"' % vnf_name)
         cmds.append('sudo docker exec mn.%s route add -net 10.0.0.0/24 input-ids' % vnf_name)
         cmds.append('sudo docker exec mn.%s /bin/bash -c "sleep 5 && route del 10.0.10.10"' % vnf_name)
 
@@ -540,29 +538,36 @@ def benchmark(algo, line, mbps):
     num_of_chains = int(line)
 
     # # kill existing tcpreplay and dstat, and copy traces to the source VNF
-    for chain_index in range(num_of_chains):
-        #     cmds.append(
-        #         'sudo docker exec mn.chain%d-source pkill tcpreplay"' % chain_index)
-        #     cmds.append(
-        #         'sudo docker exec mn.chain%d-sink pkill python2"' % chain_index)
-        #     # remove stale dstat output file (if any)
-        #     cmds.append(
-        #         'sudo docker exec mn.chain%d-sink rm /tmp/dstat.csv"' % chain_index)
-        cmds.append(
-            'sudo docker cp ../traces/output2.pcap mn.chain%d-source:/' % chain_index)
-
+    # glog.info('Cleaning up existing debris...')
+    # for chain_index in range(num_of_chains):
+    #     cmds.append(
+    #         'sudo docker exec mn.chain%d-source pkill tcpreplay"' % chain_index)
+    #     cmds.append(
+    #         'sudo docker exec mn.chain%d-sink pkill python2"' % chain_index)
+    #     # remove stale dstat output file (if any)
+    #     cmds.append(
+    #         'sudo docker exec mn.chain%d-sink rm /tmp/dstat.csv"' % chain_index)
     cmds.append('sudo rm -f ./results/allocation/%s%s/*.csv' %
                 (algo, str(mbps)))
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
         print('returned %d from %s (0 is success)' % (execStatus, cmd))
+    cmds[:] = []
 
+    # # copy the traces into the containers for tcpreplay, this might take a while
+    glog.info('Copying traces into the containers...')
+    for chain_index in range(num_of_chains):
+        cmds.append(
+            'sudo docker cp ../traces/output.pcap mn.chain%d-source:/' % chain_index)
+    for cmd in cmds:
+        execStatus = subprocess.call(cmd, shell=True)
+        print('returned %d from %s (0 is success)' % (execStatus, cmd))
     cmds[:] = []
 
     for chain_index in range(num_of_chains):
         cmds.append(
             'sudo docker exec -d mn.chain%d-sink dstat --net --time -N intf2 --bits --output /tmp/dstat.csv' % chain_index)
-        #cmds.append('sudo docker exec mn.chain%d-sink iperf3 -s &' % chain_index)
+        # cmds.append('sudo docker exec mn.chain%d-sink iperf3 -s &' % chain_index)
 
     for cmd in cmds:
         execStatus = subprocess.call(cmd, shell=True)
@@ -575,7 +580,8 @@ def benchmark(algo, line, mbps):
 
     for chain_index in range(num_of_chains):
         # each loop is around 1s for 10 Mbps speed, 100 loops easily make 1m
-        cmds.append('sudo docker exec -d mn.chain%d-source tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 output2.pcap' % (chain_index, mbps))
+        cmds.append('sudo docker exec -d mn.chain%d-source tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 output.pcap'
+                    % (chain_index, mbps))
         # cmds.append('sudo docker exec -d mn.chain%d-source iperf3 --zerocopy  -b %dm -c 10.0.10.10 -t 86400' % (chain_index, mbps))
 
     for cmd in cmds:
@@ -670,6 +676,8 @@ if __name__ == '__main__':
     bandwidths = [10]
     # algos = ['daisy']
     print(inspect.getmodule(DCNetwork).__file__)
+    os.system("ulimit -n 100000")
+
     for mbps in bandwidths:
         for algo in algos:
             # start API and containernet
@@ -697,7 +705,7 @@ if __name__ == '__main__':
                 if alloc.startswith('allocation'):
                     num_of_chains += 1
             glog.info('allocs: %s; num_of_chains = %d', allocs, num_of_chains)
-            num_of_chains = 1
+            # num_of_chains = 1
             # sys.exit(0)
             # allocate chains by placing them on appropriate servers
             vnfs = allocate_chains(dcs, allocs, num_of_chains)
@@ -707,6 +715,9 @@ if __name__ == '__main__':
             glog.info('Chain setup done. You should see the terminal now.')
             # CLI(net)
             algo = algo + str(compute) + "_"
+            glog.info('Sleeping 30 seconds before benchmarking')
+            os.system('sudo pkill -f "bash --norc -is mininet"')
+            time.sleep(30)
             benchmark(algo=algo, line=num_of_chains, mbps=mbps)
             net.stop()
             cleanup()
