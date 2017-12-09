@@ -5,6 +5,10 @@ import numpy as np
 import json
 import csv
 import os
+import collections
+import sys
+
+import glog
 
 
 def extract_iperf(fname):
@@ -42,7 +46,7 @@ def extract_dstat(fname, pos, omit_sec, duration):
             rest = val.split(sep, 1)[0]
             if rest.isdigit():
                 # multiply to 8 to convert byte to bit (dstat reports on bytes)
-                mbps = 8.0 * float(rest) / 1048576.0  # = (1024 * 1024)
+                mbps = round(8.0 * float(rest) / 1048576.0, 4) # = (1024 * 1024)
                 bw.append(mbps)
 
     # we need to trim first 3 seconds as dstat monitoring starts 3 seconds
@@ -51,6 +55,29 @@ def extract_dstat(fname, pos, omit_sec, duration):
     # we also care about only 60s execution since iperf3 terminates after 60s
     bw = bw[:duration]
     return bw
+
+
+def extract_dstat_with_time(fname, pos):
+    """ Extracts bandwidth and timestamp as a dict from CSV file. """
+    bw_dict = collections.OrderedDict()
+    # open the csv file with Python CSV parser, walk through each line (row) and
+    # add to the bandwidth array only if the row value is numeric (digit), which
+    # corresponds to the interface bandwidth reported on bps.
+    with open(fname) as data_file:
+        reader = csv.DictReader(data_file)
+        for row in reader:
+            val = row['Dstat 0.7.3 CSV output']
+            if val.isdigit():
+                bw_val, timestamp = val, row[None][-1]
+                # glog.info('%s, %s', bw_val, timestamp)
+
+                # multiply to 8 to convert byte to bit (dstat reports on bytes)
+                mbps = round(8.0 * float(bw_val) / 1048576.0, 4) # = (1024 * 1024)
+                bw_dict[timestamp] = mbps
+
+    # glog.info(bw_dict)
+    return bw_dict
+
 
 
 def plot_upgrade(mbps):
@@ -452,11 +479,97 @@ def plot_allocate_iperf(compute, mbps, duration):
               ['random', 'packing', 'daisy'], bw_range, allocs_range)
     # vdc_names, bw_range, allocs_range
 
+
+def get_chain_bandwidth(base_path, omit_sec, duration):
+    num_of_chains = 0
+    for file in os.listdir(base_path):
+        if file.endswith(".csv"):
+            num_of_chains += 1
+    # we monitor sink VNF RX traffic, which is the value on the 1st position
+    # of the CSV file.
+    chains = collections.OrderedDict()
+
+    for index in range(num_of_chains):
+        chains['chain%d'%index] = extract_dstat_with_time(base_path +
+                '/e2-allocate-from-chain%d-sink.csv'%index, 0)
+        # print('sink_bw = %s, len = %d' % (sink_bw, len(sink_bw)))
+    # glog.info('length = %s', len(chains))
+
+    for index in range(1, num_of_chains, 1):
+        for timestamp, bw_val in chains['chain%d'%index].iteritems():
+            if timestamp in chains['chain0']:
+                chains['chain0'][timestamp] += chains['chain%d'%index][timestamp]
+
+    bw = chains['chain0'].values()
+    total_time = len(bw)
+    # glog.info('bw = %s\nlen = %d', bw, len(bw))
+    # we need to trim from head and tail for sanity
+    bw = bw[omit_sec:]
+    bw = bw[:duration]
+
+    return (num_of_chains, total_time,  bw)
+
+
+def plot_iterative():
+    # amount of seconds to skip data collection, and duration of the experiment
+    omit_sec, duration = 0, 2260 # 1860
+    time_range = [0, 2200]
+    bandwidth_range = [0, 550]
+    t = np.arange(0.0, duration, 1)
+
+    alg_band_values = {}
+    alg_num_of_chains = {}
+    alg_total_time = {}
+
+    alg_base_paths = {}
+    #alg_base_paths['random'] = './results/iter-allocation/random10'
+    #alg_base_paths['netpack'] = './results/iter-allocation/packing10'
+    alg_base_paths['vnfsolver'] = './results/iter-allocation/daisy10'
+    for alg_key, alg_base_path in alg_base_paths.iteritems():
+        alg_num_of_chains[alg_key], alg_total_time[alg_key], alg_band_values[alg_key] = get_chain_bandwidth(
+                alg_base_path, omit_sec, duration)
+        glog.info('%s: chains = %d, time range = %d', alg_key,
+                alg_num_of_chains[alg_key], alg_total_time[alg_key])
+
+    figure_name = 'results/iterative.png'
+    figure_name_pdf = 'results/iterative.pdf'
+
+    # Plots the figure
+    fig, ax = plt.subplots(figsize=(8, 2))
+    msize = 7
+    axes = plt.gca()
+
+    plt.xlabel('Time (s)')
+    plt.ylabel('Throughput (Mbps)')
+    plt.ylim(bandwidth_range)
+    plt.yticks(np.arange(0, 510, 100))
+
+    plt.xlim(time_range)
+    plt.xticks(np.arange(0, time_range[1], 300))
+
+    # ax.plot(t, alg_band_values['random'], linestyle='-', color='r',
+    #         label='Random', marker='x', markersize=msize, markevery=[100, 300])
+    # ax.plot(t, alg_band_values['netpack'], linestyle='-', color='g',
+    #         label='NetPack', marker='d', markersize=msize, markevery=[200, 300])
+    ax.plot(t, alg_band_values['vnfsolver'], linestyle='-', color='b',
+            label='VNFSolver', marker='>', markersize=msize, markevery=[300, 300])
+ 
+    plt.legend(loc='upper left', bbox_to_anchor=(0.05, 1.3), numpoints=1, ncol=4,
+               frameon=False)
+    plt.draw()
+    final_figure = plt.gcf()
+    final_figure.savefig(figure_name, bbox_inches='tight', dpi=200)
+    final_figure.savefig(figure_name_pdf, bbox_inches='tight', dpi=200)
+
+    print('plotting done, see %s' % figure_name)
+    plt.close(fig)
+
+
 if __name__ == '__main__':
     # plot_upgrade(10)
 
-    ####### this one is used in the paper
-    # plot_upgrade(100)
+    # plot_upgrade(100) # this one is used in the paper
+    plot_iterative() # this one is used in the paper
     
 
     # plot_upgrade(1000)
@@ -470,8 +583,7 @@ if __name__ == '__main__':
     # plot_scaleout(10, False)
 
 
-    ####### this one is used in the paper
-    # plot_scaleout(100, False)
+    # plot_scaleout(100, False) # this one is used in the paper
 
 
     # plot_scaleout(1000, False)
@@ -483,8 +595,7 @@ if __name__ == '__main__':
     # plot_allocate_iperf(compute=10, mbps=100, duration=60)
 
 
-    ####### this one is used in the paper
-    plot_allocate(compute=20, mbps=10, duration=60)
+    #plot_allocate(compute=20, mbps=10, duration=60) # this one is used in the paper
 
 
     # plot_allocate(compute=20, mbps=100, duration=60)
