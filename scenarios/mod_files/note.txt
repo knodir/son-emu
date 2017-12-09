@@ -24,3 +24,14 @@ To avoid running out of file descriptors execute "ulimit -n unlimited" in the te
 
 Find out how many descriptors are being used:
 more /proc/sys/fs/file-nr
+
+Maybe a script will help?
+echo "root soft nofile 1048576" > /etc/security/limits.conf
+echo "root hard nofile 1048576" >> /etc/security/limits.conf
+echo "root soft nproc 10485760" >> /etc/security/limits.conf
+echo "root hard nproc 10485760" >> /etc/security/limits.conf
+echo "root soft stack 32768" >> /etc/security/limits.conf
+echo "root hard stack 32768" >> /etc/security/limits.conf
+echo "kernel.threads-max = 2091845" >> /etc/sysctl.conf
+sysctl -p
+echo 210000 > /proc/sys/kernel/pty/max
