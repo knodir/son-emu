@@ -55,11 +55,13 @@ def finish_benchmark(algo, num_of_chains, mbps):
     cmds = []
 
     # kill existing tcpreplay and dstat
-    for chain_index in range(num_of_chains):
-        cmds.append(
-            'sudo docker exec mn.chain%d-source pkill tcpreplay' % chain_index)
-        cmds.append(
-            'sudo docker exec mn.chain%d-sink pkill python2' % chain_index)
+    # for chain_index in range(num_of_chains):
+    #     cmds.append(
+    #         'sudo docker exec mn.chain%d-source pkill tcpreplay' % chain_index)
+    #     cmds.append(
+    #         'sudo docker exec mn.chain%d-sink pkill python2' % chain_index)
+    cmds.append("sudo killall tcpreplay")
+    cmds.append("sudo killall dstat")
     executeCmds(cmds)
     cmds[:] = []
 

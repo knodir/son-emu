@@ -57,9 +57,9 @@ def init_sink(vnf_name):
     cmds.append('sudo docker exec mn.%s ufw enable' % vnf_name)
     # open iperf3 port (5201) on firewall (ufw)
     cmds.append('sudo docker exec mn.%s ufw allow 5201' % vnf_name)
-    cmds.append('sudo docker exec mn.%s ufw status' % vnf_name)
+    # cmds.append('sudo docker exec mn.%s ufw status' % vnf_name)
     cmds.append('sudo docker exec mn.%s service openvpn start' % vnf_name)
-    cmds.append('sudo docker exec mn.%s service openvpn status' % vnf_name)
-    cmds.append('sudo docker exec mn.%s service rsyslog start' % vnf_name)
-    cmds.append('sudo docker exec mn.%s service rsyslog status' % vnf_name)
+    # cmds.append('sudo docker exec mn.%s service openvpn status' % vnf_name)
+    # cmds.append('sudo docker exec mn.%s service rsyslog start' % vnf_name)
+    # cmds.append('sudo docker exec mn.%s service rsyslog status' % vnf_name)
     return cmds
