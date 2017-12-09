@@ -89,3 +89,5 @@ utils/ci/junit-xml/*.xml
 *.sublime-project
 
 *.dmp
+
+scenarios/experiments/output\.txt
