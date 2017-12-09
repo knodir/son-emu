@@ -81,7 +81,8 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
                     dc_emulation_max_cpu=max_cu_net,
                     dc_emulation_max_mem=max_mu_net,
                     enable_learning=False)
-
+    ram_factor = 512
+    cpu_factor = 1
     # Read physical topology from file.
     with open(pn_fname) as data_file:
         data = json.load(data_file)
@@ -97,7 +98,9 @@ def prepareDC(pn_fname, max_cu, max_mu, max_cu_net, max_mu_net):
 
     rms = {}
     for name, props in data['Servers'].iteritems():
-        rms[name] = UpbSimpleCloudDcRM(max_cu, max_mu)
+        json_cpu = props[0]
+        json_ram = props[1]
+        rms[name] = UpbSimpleCloudDcRM(json_cpu * cpu_factor, json_ram * ram_factor)
 
     for dc_name, dc_obj in dcs.iteritems():
         dc_obj.assignResourceModel(rms[dc_name])
