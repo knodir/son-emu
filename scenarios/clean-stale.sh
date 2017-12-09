@@ -10,5 +10,6 @@ sudo killall /usr/bin/dockerd
 sudo killall /usr/lib/snapd/snapd
 sudo killall ryu-manager
 sudo killall iperf3
+sudo pkill -f "bash --norc -is mininet"
 ps -ef | grep python
 ps -ef | grep docker

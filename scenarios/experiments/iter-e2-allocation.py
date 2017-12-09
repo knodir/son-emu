@@ -3,30 +3,17 @@ import logging
 import os
 import glog
 
+from mininet.cli import CLI
+from mininet.clean import cleanup
+from optparse import OptionParser
+
 import daisy
 import bench
 
-from emuvim.dcemulator.net import DCNetwork
-from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
-from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM
 
-
-from mininet.cli import CLI
-from mininet.node import RemoteController
-from mininet.clean import cleanup
-from mininet.node import DefaultController
-from optparse import OptionParser
-
-
-
-
-
-def iterative_benchmark(allocs, dcs, mbps):
+def iterative_benchmark(mappings, dcs, mbps):
     chain_index = 0
-    for alloc_name, chain_mapping in allocs.iteritems():
-        if not alloc_name.startswith('allocation'):
-            glog.info('not an allocation, but metadata: %s', alloc_name)
-            continue
+    for chain_mapping in mappings:
         glog.info('started allocating chain: %d', chain_index)
         vnfs = daisy.allocate_chains(dcs, [chain_mapping], chain_index)
         daisy.plumb_chains(net, vnfs, 1, chain_index)
@@ -102,16 +89,18 @@ if __name__ == '__main__':
                 if alloc.startswith('allocation'):
                     num_of_chains += 1
             # glog.info('allocs: %s' % allocs)
-            iterative_benchmark(allocs, dcs, mbps)
+            # num_of_chains = 1
+            mappings = daisy.get_chain_mappings(allocs)
+            iterative_benchmark(mappings, dcs, mbps)
 
             glog.info('Chain setup done. You should see the terminal now.')
-
-            print('>>> wait 600s to complete the experiment')
+            glog.info('>>> wait 600s to complete the experiment')
             time.sleep(600)
-            print('<<< wait complete.')
+            # CLI(net)
+            glog.info('<<< wait complete.')
             print('Cleaning up benchmarking information')
+            os.system('sudo pkill -f "bash --norc -is mininet"')
             bench.finish_benchmark(algo, num_of_chains, mbps)
             net.stop()
-
             cleanup()
             os.system("sudo ../clean-stale.sh")

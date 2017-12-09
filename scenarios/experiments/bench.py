@@ -15,22 +15,24 @@ def start_benchmark(algo, num_of_chains, mbps, chain_index=None):
     executeCmds(cmds)
     cmds[:] = []
 
+    # # copy the traces into the containers for tcpreplay, this might take a while
+    glog.info('Copying traces into the containers...')
     if chain_index is None:
         for chain_index in range(num_of_chains):
-            # # copy the traces into the containers for tcpreplay, this might take a while
-            glog.info('Copying traces into the containers...')
             cmds.append('sudo docker cp ../traces/output.pcap mn.chain%d-source:/' % chain_index)
     else:
         cmds.append('sudo docker cp ../traces/output.pcap mn.chain%d-source:/' % chain_index)
     executeCmds(cmds)
     cmds[:] = []
 
+    # # copy the traces into the containers for tcpreplay, this might take a while
+    glog.info('Running dstat...')
     if chain_index is None:
         for chain_index in range(num_of_chains):
             cmds.append('sudo docker exec -d mn.chain%d-sink dstat --net --time -N intf2 --bits --output /tmp/dstat.csv' % chain_index)
         # cmds.append('sudo docker exec mn.chain%d-sink iperf3 -s &' % chain_index)
     else:
-        cmds.append('sudo docker cp ../traces/output.pcap mn.chain%d-source:/' % chain_index)
+        cmds.append('sudo docker exec -d mn.chain%d-sink dstat --net --time -N intf2 --bits --output /tmp/dstat.csv' % chain_index)
     executeCmds(cmds)
     cmds[:] = []
 
@@ -44,7 +46,7 @@ def start_benchmark(algo, num_of_chains, mbps, chain_index=None):
             cmds.append('sudo docker exec -d mn.chain%d-source tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 output.pcap' % (chain_index, mbps))
         # cmds.append('sudo docker exec -d mn.chain%d-source iperf3 --zerocopy  -b %dm -c 10.0.10.10 -t 86400' % (chain_index, mbps))
     else:
-        cmds.append('sudo docker cp ../traces/output.pcap mn.chain%d-source:/' % chain_index)
+        cmds.append('sudo docker exec -d mn.chain%d-source tcpreplay --loop=0 --mbps=%d -d 1 --intf1=intf1 output.pcap' % (chain_index, mbps))
     executeCmds(cmds)
     cmds[:] = []
 
@@ -61,7 +63,7 @@ def finish_benchmark(algo, num_of_chains, mbps):
     #     cmds.append(
     #         'sudo docker exec mn.chain%d-sink pkill python2' % chain_index)
     cmds.append("sudo killall tcpreplay")
-    cmds.append("sudo killall dstat")
+    cmds.append("sudo killall python2")
     executeCmds(cmds)
     cmds[:] = []
 

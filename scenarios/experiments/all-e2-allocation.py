@@ -1,22 +1,14 @@
-import sys
+import time
 import logging
 import os
 import glog
-import inspect
-import time
+
+from mininet.cli import CLI
+from mininet.clean import cleanup
+from optparse import OptionParser
 
 import daisy
 import bench
-
-from emuvim.dcemulator.net import DCNetwork
-from emuvim.api.rest.rest_api_endpoint import RestApiEndpoint
-from emuvim.dcemulator.resourcemodel.upb.simple import UpbSimpleCloudDcRM
-
-from mininet.cli import CLI
-from mininet.node import RemoteController
-from mininet.clean import cleanup
-from mininet.node import DefaultController
-from optparse import OptionParser
 
 
 if __name__ == '__main__':
@@ -57,7 +49,6 @@ if __name__ == '__main__':
     algos = ['daisy', 'random', 'packing']
     bandwidths = [10]
     # algos = ['daisy']
-    print(inspect.getmodule(DCNetwork).__file__)
     os.system("ulimit -n 100000")
 
     for mbps in bandwidths:

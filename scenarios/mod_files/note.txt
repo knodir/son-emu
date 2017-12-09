@@ -18,5 +18,9 @@ After setting up all the infrastructure and before running benchmarks.
 https://glassonionblog.wordpress.com/2013/01/27/increase-ulimit-and-file-descriptors-limit/
 http://man7.org/linux/man-pages/man3/pthread_create.3.html
 https://unix.stackexchange.com/questions/253903/creating-threads-fails-with-resource-temporarily-unavailable-with-4-3-kernel
+http://www.xenoclast.org/doc/benchmark/HTTP-benchmarking-HOWTO/node7.html
 
-To avoid running out of file descriptors execute "ulimit -n 1000000" in the terminal you are running scale tests in.
+To avoid running out of file descriptors execute "ulimit -n unlimited" in the terminal you are running scale tests in.
+
+Find out how many descriptors are being used:
+more /proc/sys/fs/file-nr
