@@ -507,12 +507,12 @@ def get_chain_bandwidth(base_path, omit_sec, duration):
     bw = bw[omit_sec:]
     bw = bw[:duration]
 
-    return (num_of_chains, total_time,  bw)
+    return (num_of_chains, total_time, bw)
 
 
 def plot_iterative():
     # amount of seconds to skip data collection, and duration of the experiment
-    omit_sec, duration = 0, 2260 # 1860
+    omit_sec, duration = 0, 2200
     time_range = [0, 2200]
     bandwidth_range = [0, 550]
     t = np.arange(0.0, duration, 1)
@@ -522,14 +522,15 @@ def plot_iterative():
     alg_total_time = {}
 
     alg_base_paths = {}
-    #alg_base_paths['random'] = './results/iter-allocation/random10'
-    #alg_base_paths['netpack'] = './results/iter-allocation/packing10'
+    alg_base_paths['random'] = './results/iter-allocation/random10'
+    alg_base_paths['netpack'] = './results/iter-allocation/packing10'
     alg_base_paths['vnfsolver'] = './results/iter-allocation/daisy10'
     for alg_key, alg_base_path in alg_base_paths.iteritems():
         alg_num_of_chains[alg_key], alg_total_time[alg_key], alg_band_values[alg_key] = get_chain_bandwidth(
                 alg_base_path, omit_sec, duration)
-        glog.info('%s: chains = %d, time range = %d', alg_key,
-                alg_num_of_chains[alg_key], alg_total_time[alg_key])
+        glog.info('%s: chains = %d, time range = %d, max_band = %d', alg_key,
+                alg_num_of_chains[alg_key], alg_total_time[alg_key],
+                max(alg_band_values[alg_key]))
 
     figure_name = 'results/iterative.png'
     figure_name_pdf = 'results/iterative.pdf'
@@ -547,10 +548,10 @@ def plot_iterative():
     plt.xlim(time_range)
     plt.xticks(np.arange(0, time_range[1], 300))
 
-    # ax.plot(t, alg_band_values['random'], linestyle='-', color='r',
-    #         label='Random', marker='x', markersize=msize, markevery=[100, 300])
-    # ax.plot(t, alg_band_values['netpack'], linestyle='-', color='g',
-    #         label='NetPack', marker='d', markersize=msize, markevery=[200, 300])
+    ax.plot(t, alg_band_values['random'], linestyle='-', color='r',
+            label='Random', marker='x', markersize=msize, markevery=[100, 300])
+    ax.plot(t, alg_band_values['netpack'], linestyle='-', color='g',
+            label='NetPack', marker='d', markersize=msize, markevery=[200, 300])
     ax.plot(t, alg_band_values['vnfsolver'], linestyle='-', color='b',
             label='VNFSolver', marker='>', markersize=msize, markevery=[300, 300])
  
