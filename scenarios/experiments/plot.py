@@ -79,7 +79,6 @@ def extract_dstat_with_time(fname, pos):
     return bw_dict
 
 
-
 def plot_upgrade(mbps):
     # amount of seconds to skip data collection, and duration of the experiment
     omit_sec, duration = 0, 300
@@ -512,9 +511,9 @@ def get_chain_bandwidth(base_path, omit_sec, duration):
 
 def plot_iterative():
     # amount of seconds to skip data collection, and duration of the experiment
-    omit_sec, duration = 0, 2200
-    time_range = [0, 2200]
-    bandwidth_range = [0, 550]
+    omit_sec, duration = 0, 3570
+    time_range = [0, 3601]
+    bandwidth_range = [0, 700]
     t = np.arange(0.0, duration, 1)
 
     alg_band_values = {}
@@ -540,13 +539,13 @@ def plot_iterative():
     msize = 7
     axes = plt.gca()
 
-    plt.xlabel('Time (s)')
-    plt.ylabel('Throughput (Mbps)')
+    plt.xlabel('Time (s)', fontsize=18)
+    plt.ylabel('Throughput (Mbps)', fontsize=18)
     plt.ylim(bandwidth_range)
-    plt.yticks(np.arange(0, 510, 100))
+    plt.yticks(np.arange(0, 751, 250), fontsize=16)
 
     plt.xlim(time_range)
-    plt.xticks(np.arange(0, time_range[1], 300))
+    plt.xticks(np.arange(0, time_range[1], 600), fontsize=16)
 
     ax.plot(t, alg_band_values['random'], linestyle='-', color='r',
             label='Random', marker='x', markersize=msize, markevery=[100, 300])
@@ -556,7 +555,7 @@ def plot_iterative():
             label='VNFSolver', marker='>', markersize=msize, markevery=[300, 300])
  
     plt.legend(loc='upper left', bbox_to_anchor=(0.05, 1.3), numpoints=1, ncol=4,
-               frameon=False)
+               frameon=False, fontsize=16)
     plt.draw()
     final_figure = plt.gcf()
     final_figure.savefig(figure_name, bbox_inches='tight', dpi=200)
