@@ -11,23 +11,24 @@ import daisy
 import bench
 
 
-def iterative_benchmark(mappings, dcs, mbps):
+def iterative_benchmark(mappings, dcs, mbps, isIperf=False):
     chain_index = 0
     for chain_mapping in mappings:
         glog.info('started allocating chain: %d', chain_index)
         vnfs = daisy.allocate_chains(dcs, [chain_mapping], chain_index)
         daisy.plumb_chains(net, vnfs, 1, chain_index)
         # os.system('sudo pkill -f "bash --norc -is mininet"')
-        bench.start_benchmark(algo, 1, mbps, chain_index)
+        bench.start_benchmark(algo, 1, mbps, chain_index, isIperf)
+        os.system('sudo pkill -f "bash --norc -is mininet:chain%d"' % chain_index)
         chain_index += 1
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     parser = OptionParser()
-    parser.add_option("-t", "--topo", dest="topology",
-                      help="Specifiy the NSS topology")
+    parser.add_option("-t", "--topo", dest="topology", help="Specifiy the NSS topology")
+    parser.add_option("-i", "--iperf", action="store_true", dest="iperf", default=False, help="Use Iperf instead")
 
     (options, args) = parser.parse_args()
     topology = options.topology
@@ -57,7 +58,8 @@ if __name__ == '__main__':
     else:
         # e2-azure-1rack-50servers with 20 compute
         vn_fname = "../topologies/e2-chain-4vnfs-50wa.vn.json"
-        pn_fname = "../topologies/e2-azure-1rack-50-20servers.pn.json"
+        # pn_fname = "../topologies/e2-azure-1rack-50-20servers.pn.json"
+        pn_fname = "../topologies/e2-azure-1rack-50-20servers-2xcap.pn.json"
         compute = 20
     algos = ['daisy', 'random', 'packing']
     bandwidths = [10]
@@ -91,16 +93,19 @@ if __name__ == '__main__':
             # glog.info('allocs: %s' % allocs)
             # num_of_chains = 1
             mappings = daisy.get_chain_mappings(allocs)
-            iterative_benchmark(mappings, dcs, mbps)
+            iterative_benchmark(mappings, dcs, mbps, options.iperf)
 
             glog.info('Chain setup done. You should see the terminal now.')
-            glog.info('>>> wait 600s to complete the experiment')
-            time.sleep(600)
+            glog.info('>>> wait 1300s to complete the experiment')
+            time.sleep(1300)
             # CLI(net)
             glog.info('<<< wait complete.')
             print('Cleaning up benchmarking information')
             os.system('sudo pkill -f "bash --norc -is mininet"')
-            bench.finish_benchmark(algo, num_of_chains, mbps)
+            bench.finish_benchmark(algo, num_of_chains, mbps, options.iperf)
             net.stop()
             cleanup()
             os.system("sudo ../clean-stale.sh")
+
+
+glog.info('Full success.')
