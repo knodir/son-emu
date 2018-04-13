@@ -78,6 +78,7 @@ Vagrant.configure(2) do |config|
   # argument is a set of non-required options.
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.synced_folder ".", "/home/ubuntu/son-emu"
+  config.vm.synced_folder "../nettraces", "/home/ubuntu/traces"
   
 
   # Provider-specific configuration so you can fine-tune various
@@ -90,8 +91,8 @@ Vagrant.configure(2) do |config|
   #   vb.gui = true
   #
   #   # Customize the amount of memory on the VM:
-    vb.memory = "4096"
-    vb.cpus = 1
+    vb.memory = "8192"
+    vb.cpus = 3
     # vb.memory = "1024"
   end
   #
